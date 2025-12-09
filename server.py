@@ -10,6 +10,7 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.types import (
     Tool, 
     TextContent, 
@@ -17,9 +18,7 @@ from mcp.types import (
     Prompt, 
     PromptArgument, 
     GetPromptResult,
-    PromptMessage,
-    TextResourceContents,
-    ReadResourceResult
+    PromptMessage
 )
 from sqlmodel import Session
 
@@ -201,7 +200,7 @@ async def handle_list_resources() -> list[Resource]:
 
 
 @app.read_resource()
-async def handle_read_resource(uri: str) -> ReadResourceResult:
+async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
     """
     Read a specific resource by URI.
     
@@ -209,7 +208,7 @@ async def handle_read_resource(uri: str) -> ReadResourceResult:
         uri: URI of the resource to read
         
     Returns:
-        ReadResourceResult containing the resource contents
+        List of ReadResourceContents with the resource data
         
     Raises:
         Exception: If resource reading fails
@@ -222,16 +221,13 @@ async def handle_read_resource(uri: str) -> ReadResourceResult:
         with Session(engine) as session:
             content = get_resource(uri, persona, session)
         
-        # Return as TextResourceContents
-        return ReadResourceResult(
-            contents=[
-                TextResourceContents(
-                    uri=uri,
-                    mimeType="text/plain",
-                    text=content
-                )
-            ]
-        )
+        # Return as list of ReadResourceContents
+        return [
+            ReadResourceContents(
+                content=content,
+                mime_type="text/plain"
+            )
+        ]
     
     except ResourceNotFoundError as e:
         # Resource not found - raise exception
