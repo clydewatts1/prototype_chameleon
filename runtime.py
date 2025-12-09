@@ -210,8 +210,11 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
         ResourceNotFoundError: If the resource is not found
         SecurityError: If hash validation fails for dynamic resources
     """
+    # Convert uri to string in case it's a Pydantic AnyUrl or other type
+    uri_str = str(uri)
+    
     # Query ResourceRegistry for the resource by URI
-    statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri)
+    statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri_str)
     resource = db_session.exec(statement).first()
     
     if not resource:
@@ -246,7 +249,7 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
     
     # Execute the code with uri as a parameter
     local_scope = {
-        'uri': uri,
+        'uri': uri_str,
         'persona': persona,
         'db_session': db_session,
     }
