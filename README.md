@@ -100,7 +100,27 @@ The server will:
 - Create tables if they don't exist
 - Start listening for MCP requests on stdio
 
-### 3. Interact with the Server
+### 3. Run the Admin GUI (Optional)
+
+Manage your tools and database using the Streamlit admin interface:
+
+```bash
+streamlit run admin_gui.py
+```
+
+The admin GUI provides:
+- **Dashboard**: View metrics (total tools, code blobs, unique personas)
+- **Tool Registry**: Browse, filter by persona, and delete tools
+- **Add New Tool**: Create or update tools with a user-friendly form
+
+By default, the GUI connects to `sqlite:///chameleon.db`. To use a different database:
+
+```bash
+export CHAMELEON_DB_URL="postgresql://user:pass@host/db"
+streamlit run admin_gui.py
+```
+
+### 4. Interact with the Server
 
 The server implements the MCP protocol and supports:
 
@@ -286,9 +306,10 @@ with Session(engine) as session:
 
 The server uses SQLite by default (`chameleon.db`). The database file is automatically created on first run.
 
-To use a different database, modify the connection string in:
-- `server.py`: In the `lifespan` function, change `get_engine("sqlite:///chameleon.db")`
-- `seed_db.py`: In the `seed_database` function, change the default parameter value
+To use a different database:
+- **Admin GUI**: Set the `CHAMELEON_DB_URL` environment variable (e.g., `export CHAMELEON_DB_URL="postgresql://user:pass@host/db"`)
+- **MCP Server**: Modify the connection string in `server.py`, in the `lifespan` function
+- **Seed Script**: Modify the default parameter in `seed_db.py`, in the `seed_database` function
 
 Supported databases: Any SQLAlchemy-compatible database (PostgreSQL, MySQL, etc.)
 
@@ -303,6 +324,7 @@ prototype_chameleon/
 ├── runtime.py         # Code execution engine
 ├── server.py          # MCP server implementation
 ├── seed_db.py         # Database seeding script
+├── admin_gui.py       # Streamlit admin GUI
 └── .gitignore         # Git ignore patterns
 ```
 
