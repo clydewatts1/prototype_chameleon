@@ -218,6 +218,30 @@ result = text.upper()
         session.add(code_review_prompt)
         print(f"   ✅ Prompt 'code_review' added")
         
+        # Sample Resource 2: Dynamic resource that generates current timestamp
+        print("\n[7] Adding dynamic resource 'server_time'...")
+        server_time_code = """from datetime import datetime
+result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+"""
+        server_time_hash = _compute_hash(server_time_code)
+        
+        server_time_vault = CodeVault(
+            hash=server_time_hash,
+            python_blob=server_time_code
+        )
+        session.add(server_time_vault)
+        
+        server_time_resource = ResourceRegistry(
+            name="server_time",
+            uri_schema="chameleon://time",
+            description="Returns the current server time dynamically",
+            is_dynamic=True,
+            static_content=None,
+            active_hash_ref=server_time_hash
+        )
+        session.add(server_time_resource)
+        print(f"   ✅ Resource 'server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
+        
         # Commit all changes
         session.commit()
         
@@ -233,6 +257,7 @@ result = text.upper()
         print("  - uppercase (persona: default)")
         print("\nResources added:")
         print("  - welcome_message (static)")
+        print("  - server_time (dynamic)")
         print("\nPrompts added:")
         print("  - code_review")
         print("\nYou can now run the MCP server with: python server.py")
