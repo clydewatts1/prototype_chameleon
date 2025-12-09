@@ -39,10 +39,8 @@ def seed_database(database_url: str = "sqlite:///chameleon.db"):
     
     with Session(engine) as session:
         # Sample Tool 1: Greeting function
-        greeting_code = """def run(args, db):
-    return f'Hello {args.get("name")}! I am running from the database.'
-
-result = run(arguments, db_session)
+        greeting_code = """name = arguments.get('name', 'Guest')
+result = f'Hello {name}! I am running from the database.'
 """
         greeting_hash = _compute_hash(greeting_code)
         
