@@ -18,7 +18,7 @@ EXECUTION CONTRACT:
 """
 
 import hashlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
@@ -189,7 +189,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     ]
 
 
-def get_resource(uri: str, persona: str, db_session: Session) -> str:
+def get_resource(uri: Union[str, Any], persona: str, db_session: Session) -> str:
     """
     Get a resource by URI and execute if dynamic.
     
@@ -199,7 +199,7 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
     3. If dynamic, executes code from CodeVault
     
     Args:
-        uri: URI of the resource to retrieve
+        uri: URI of the resource to retrieve (string or Pydantic AnyUrl)
         persona: The persona/context for which to get the resource
         db_session: SQLModel Session for database access
         
