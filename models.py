@@ -40,38 +40,29 @@ class ToolRegistry(SQLModel, table=True):
 
 class ResourceRegistry(SQLModel, table=True):
     """
-    Table for registering resources with their configurations.
-    
-    Attributes:
-        name: Name of the resource (Primary Key)
-        uri_schema: URI schema template (e.g., "note://{id}")
-        description: Description of what the resource provides
-        is_dynamic: Whether the resource requires code execution
-        static_content: Static content for non-dynamic resources (optional)
-        active_hash_ref: Foreign key reference to CodeVault hash for dynamic resources (optional)
+    Table for registering Resources.
+    Resources can be static (text stored here) or dynamic (code in CodeVault).
     """
-    name: str = Field(primary_key=True, description="Name of the resource")
-    uri_schema: str = Field(description="URI schema template (e.g., 'note://{id}')")
-    description: str = Field(description="Description of what the resource provides")
-    is_dynamic: bool = Field(default=False, description="Whether the resource requires code execution")
-    static_content: str | None = Field(default=None, description="Static content for non-dynamic resources")
-    active_hash_ref: str | None = Field(default=None, foreign_key="codevault.hash", description="Reference to CodeVault hash for dynamic resources")
+    uri_schema: str = Field(primary_key=True, description="The URI pattern (e.g. 'note://{id}')")
+    name: str = Field(description="Human readable name")
+    description: str = Field(description="Description of the resource")
+    mime_type: str = Field(default="text/plain", description="MIME type of the content")
+    
+    # Dynamic vs Static
+    is_dynamic: bool = Field(default=False, description="If True, executes code from CodeVault")
+    static_content: str | None = Field(default=None, description="Hardcoded content for static resources")
+    active_hash_ref: str | None = Field(default=None, foreign_key="codevault.hash", nullable=True, description="Ref to CodeVault if dynamic")
 
 
 class PromptRegistry(SQLModel, table=True):
     """
-    Table for registering prompts with their templates.
-    
-    Attributes:
-        name: Name of the prompt (Primary Key)
-        description: Description of what the prompt does
-        template: Template text for the prompt
-        arguments_schema: JSON schema for the prompt arguments (stored as dict/JSON)
+    Table for registering Prompts.
+    Prompts are templates that the LLM can request.
     """
-    name: str = Field(primary_key=True, description="Name of the prompt")
-    description: str = Field(description="Description of what the prompt does")
-    template: str = Field(description="Template text for the prompt")
-    arguments_schema: dict = Field(sa_column=Column(JSON), description="JSON schema for the prompt arguments")
+    name: str = Field(primary_key=True, description="Name of the prompt (e.g. 'review_code')")
+    description: str = Field(description="What this prompt does")
+    template: str = Field(description="The Jinja2 or f-string template")
+    arguments_schema: dict = Field(sa_column=Column(JSON), description="JSON Schema for arguments")
 
 
 # Database engine setup

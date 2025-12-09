@@ -179,9 +179,10 @@ result = text.upper()
         # Sample Resource 1: Static welcome message
         print("\n[5] Adding static resource 'welcome_message'...")
         welcome_resource = ResourceRegistry(
-            name="welcome_message",
             uri_schema="chameleon://welcome",
+            name="welcome_message",
             description="A welcome message for the Chameleon MCP server",
+            mime_type="text/plain",
             is_dynamic=False,
             static_content="Welcome to the Chameleon MCP Server! This is a dynamic tool execution platform that stores code in a database and serves tools based on personas.",
             active_hash_ref=None
@@ -232,9 +233,10 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         session.add(server_time_vault)
         
         server_time_resource = ResourceRegistry(
-            name="server_time",
             uri_schema="chameleon://time",
+            name="server_time",
             description="Returns the current server time dynamically",
+            mime_type="text/plain",
             is_dynamic=True,
             static_content=None,
             active_hash_ref=server_time_hash
