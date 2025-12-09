@@ -2,6 +2,19 @@
 Runtime module for secure execution of code stored in the database.
 
 This module handles fetching and executing code from CodeVault with security checks.
+
+SECURITY NOTES:
+- exec() is used as specified in the requirements for code execution
+- Hash validation ensures code integrity and detects tampering
+- db_session is passed to executed code as per requirements
+- IMPORTANT: This design assumes code in CodeVault is trusted. In production,
+  consider additional sandboxing (e.g., RestrictedPython, containers) and
+  restricted database interfaces if executing untrusted code.
+
+EXECUTION CONTRACT:
+- Executed code receives 'arguments' dict and 'db_session' in its local scope
+- Executed code should set a 'result' variable to return a value
+- If no 'result' variable is set, the function returns None
 """
 
 import hashlib
@@ -36,7 +49,7 @@ def _compute_hash(code: str) -> str:
 def execute_tool(
     tool_name: str,
     persona: str,
-    arguments: dict,
+    arguments: Dict[str, Any],
     db_session: Session
 ) -> Any:
     """
@@ -92,12 +105,18 @@ def execute_tool(
     
     # Sandbox: Execute the code
     # Create a local scope with arguments and db_session
+    # NOTE: As per requirements, exec() is used for execution and db_session
+    # is passed directly. For production with untrusted code, consider:
+    # - Using RestrictedPython or similar sandboxing
+    # - Implementing a restricted database interface layer
+    # - Running code in isolated containers/processes
     local_scope = {
         'arguments': arguments,
         'db_session': db_session,
     }
     
     # Execute the code in the local scope
+    # The code should set a 'result' variable to return a value
     exec(code_vault.python_blob, {}, local_scope)
     
     # Return the result if the code defines a 'result' variable
