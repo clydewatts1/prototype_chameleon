@@ -133,6 +133,131 @@ The server implements the MCP protocol and supports:
 
 Example tool schemas are defined in the database with JSON Schema for validation.
 
+## Connecting AI Clients
+
+Once your Chameleon MCP server is running, you can connect it to various AI clients that support the Model Context Protocol (MCP). Below are configuration instructions for popular AI CLI tools.
+
+### Claude Desktop
+
+Claude Desktop supports MCP servers through its configuration file.
+
+1. **Locate the Claude Desktop configuration file:**
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. **Add the Chameleon server configuration:**
+
+```json
+{
+  "mcpServers": {
+    "chameleon": {
+      "command": "python",
+      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
+      "env": {
+        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
+      }
+    }
+  }
+}
+```
+
+3. **Restart Claude Desktop** to load the new configuration.
+
+4. **Verify connection**: The Chameleon tools should now appear in Claude Desktop's tool menu.
+
+### VS Code with Cline Extension
+
+The Cline extension for VS Code supports MCP servers.
+
+1. **Install the Cline extension** from the VS Code marketplace.
+
+2. **Open VS Code settings** (File → Preferences → Settings or `Cmd/Ctrl + ,`).
+
+3. **Search for "MCP"** and add the Chameleon server to the MCP servers configuration:
+
+```json
+{
+  "cline.mcpServers": {
+    "chameleon": {
+      "command": "python",
+      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
+      "env": {
+        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
+      }
+    }
+  }
+}
+```
+
+4. **Reload VS Code** to activate the configuration.
+
+### Google Gemini CLI (Experimental)
+
+**Note**: As of this writing, Google's Gemini CLI does not have official MCP support. However, if/when support is added, the configuration pattern would be similar:
+
+1. **Check Gemini CLI documentation** for MCP configuration instructions.
+
+2. **Expected configuration pattern** (hypothetical):
+
+```bash
+# In your shell configuration (~/.bashrc, ~/.zshrc, etc.)
+export GEMINI_MCP_SERVERS='{"chameleon":{"command":"python","args":["/absolute/path/to/prototype_chameleon/server.py"]}}'
+```
+
+Or via a configuration file (location TBD by Google):
+
+```json
+{
+  "mcpServers": {
+    "chameleon": {
+      "command": "python",
+      "args": ["/absolute/path/to/prototype_chameleon/server.py"]
+    }
+  }
+}
+```
+
+3. **Monitor the [Gemini CLI documentation](https://ai.google.dev/)** for official MCP support announcements.
+
+### Generic MCP Client Configuration
+
+For any MCP-compatible client, you'll need:
+
+- **Command**: Path to your Python interpreter (e.g., `python`, `python3`, or `/path/to/venv/bin/python`)
+- **Args**: `["/absolute/path/to/prototype_chameleon/server.py"]`
+- **Environment Variables** (optional):
+  - `CHAMELEON_DB_URL`: Database connection string (default: `sqlite:///chameleon.db`)
+
+### Testing the Connection
+
+After configuring your AI client:
+
+1. **Start the client** (restart if already running)
+2. **Look for available tools** in the client's interface
+3. **Test a simple tool** like `greet` with the argument `{"name": "World"}`
+4. **Expected result**: `"Hello World! I am running from the database."`
+
+If tools don't appear, check:
+- Server path is correct and absolute
+- Python environment has required dependencies installed
+- Database file exists and contains seeded data
+- Client logs for connection errors
+
+### Using Virtual Environments
+
+If you're using a virtual environment for Chameleon, specify the full path to the Python interpreter:
+
+```json
+{
+  "mcpServers": {
+    "chameleon": {
+      "command": "/path/to/prototype_chameleon/venv/bin/python",
+      "args": ["/path/to/prototype_chameleon/server.py"]
+    }
+  }
+}
+```
+
 ## Adding Custom Tools
 
 To add your own tools to the database:
