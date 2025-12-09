@@ -1,0 +1,11 @@
+# MCP Server dependencies
+mcp>=1.0.0
+
+# Database dependencies
+sqlmodel>=0.0.8
+sqlalchemy>=2.0.0
+
+# Core dependencies - included with Python 3.12
+# asyncio (built-in)
+# hashlib (built-in)
+# typing (built-in)
