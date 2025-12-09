@@ -157,24 +157,27 @@ with Session(engine) as session:
 
 ## Security Considerations
 
-⚠️ **Important Security Notes**:
+⚠️ **CRITICAL SECURITY WARNING**:
 
-- The server uses `exec()` to run code from the database
-- Code integrity is verified via SHA-256 hashing
-- **This design assumes code in CodeVault is trusted**
-- For production use with untrusted code, consider:
-  - Additional sandboxing (e.g., RestrictedPython, containers)
-  - Restricted database interfaces
-  - Process isolation
+- The server uses `exec()` to run code from the database with full Python privileges
+- **Malicious code could execute arbitrary system commands, access/modify files, make network requests, or compromise the host system**
+- Code integrity is verified via SHA-256 hashing (detects tampering, not malicious intent)
+- **This design assumes ALL code in CodeVault is from trusted sources**
+- **DO NOT use in production with untrusted code without additional security measures**
+- For production use with untrusted code, you MUST implement:
+  - Additional sandboxing (e.g., RestrictedPython, Docker containers, VMs)
+  - Restricted database interfaces with limited privileges
+  - Process isolation and resource limits
   - Input validation and sanitization
+  - Code review and approval workflows
 
 ## Database
 
 The server uses SQLite by default (`chameleon.db`). The database file is automatically created on first run.
 
 To use a different database, modify the connection string in:
-- `server.py` (line 39): `get_engine("sqlite:///chameleon.db")`
-- `seed_db.py` (line 25): default parameter
+- `server.py`: In the `lifespan` function, change `get_engine("sqlite:///chameleon.db")`
+- `seed_db.py`: In the `seed_database` function, change the default parameter value
 
 Supported databases: Any SQLAlchemy-compatible database (PostgreSQL, MySQL, etc.)
 
