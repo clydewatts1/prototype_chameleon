@@ -1,15 +1,17 @@
 # Prototype Chameleon MCP Server
 
-A dynamic Model Context Protocol (MCP) server that allows execution of tools stored in a database with persona-based tool filtering. This is version 1 of the Chameleon MCP server.
+A dynamic Model Context Protocol (MCP) server that allows execution of tools, resources, and prompts stored in a database with persona-based filtering. This is version 2 of the Chameleon MCP server.
 
 ## Overview
 
-Chameleon is an innovative MCP server implementation that stores executable code in a database and dynamically serves tools based on personas. It provides:
+Chameleon is an innovative MCP server implementation that stores executable code in a database and dynamically serves tools, resources, and prompts based on personas. It provides:
 
 - **Dynamic Tool Registry**: Tools are stored in a database and can be added/modified without server code changes
+- **Resource Management**: Support for both static and dynamic resources with code execution
+- **Prompt Templates**: Store and format prompt templates with argument substitution
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
 - **Code Integrity**: SHA-256 hashing ensures code hasn't been tampered with
-- **Flexible Execution**: Tools are defined as Python code snippets stored in the database
+- **Flexible Execution**: Tools and dynamic resources are defined as Python code snippets stored in the database
 
 ## Architecture
 
@@ -18,19 +20,21 @@ The project consists of four main components:
 1. **models.py**: Database schema using SQLModel
    - `CodeVault`: Stores executable code with SHA-256 hash as primary key
    - `ToolRegistry`: Maps tools to personas with JSON schema definitions
+   - `ResourceRegistry`: Defines resources with static or dynamic content
+   - `PromptRegistry`: Stores prompt templates with argument schemas
 
 2. **runtime.py**: Secure code execution engine
    - Validates code integrity via hash checking
    - Executes stored code in controlled environment
-   - Provides tool listing and execution functions
+   - Provides tool, resource, and prompt listing and execution functions
 
 3. **server.py**: MCP server implementation
    - Implements MCP protocol using low-level Server class
-   - Handles tool listing and execution requests
+   - Handles tool, resource, and prompt listing and execution requests
    - Manages database lifecycle
 
 4. **seed_db.py**: Database seeding utility
-   - Populates database with sample tools for testing
+   - Populates database with sample tools, resources, and prompts for testing
 
 ## Installation
 
@@ -68,11 +72,20 @@ Before running the server, populate the database with sample tools:
 python seed_db.py
 ```
 
-This creates a SQLite database (`chameleon.db`) with sample tools:
+This creates a SQLite database (`chameleon.db`) with sample data:
+
+**Tools:**
 - `greet` - Greets a person by name (persona: default)
 - `add` - Adds two numbers (persona: default)
 - `multiply` - Multiplies two numbers (persona: assistant)
 - `uppercase` - Converts text to uppercase (persona: default)
+
+**Resources:**
+- `welcome_message` - Static welcome message (chameleon://welcome)
+- `server_time` - Dynamic resource that returns current server time (chameleon://time)
+
+**Prompts:**
+- `code_review` - Template for generating code review requests
 
 ### 2. Run the MCP Server
 
@@ -93,6 +106,10 @@ The server implements the MCP protocol and supports:
 
 - **List Tools**: Returns available tools based on the current persona
 - **Call Tool**: Executes a tool with provided arguments
+- **List Resources**: Returns available resources
+- **Read Resource**: Retrieves resource content (static or dynamic)
+- **List Prompts**: Returns available prompt templates
+- **Get Prompt**: Retrieves and formats a prompt with arguments
 
 Example tool schemas are defined in the database with JSON Schema for validation.
 
@@ -141,6 +158,113 @@ with Session(engine) as session:
     tool = ToolRegistry(
         tool_name="double",
         target_persona="default",
+        description="Doubles a number",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "value": {"type": "number", "description": "Value to double"}
+            },
+            "required": ["value"]
+        },
+        active_hash_ref=code_hash
+    )
+    session.add(tool)
+    session.commit()
+```
+
+## Adding Custom Resources
+
+Resources can be either static or dynamic:
+
+### Static Resource
+```python
+from models import ResourceRegistry, get_engine
+from sqlmodel import Session
+
+engine = get_engine("sqlite:///chameleon.db")
+with Session(engine) as session:
+    resource = ResourceRegistry(
+        name="my_static_resource",
+        uri_schema="myapp://static/info",
+        description="Static information resource",
+        is_dynamic=False,
+        static_content="This is static content that never changes."
+    )
+    session.add(resource)
+    session.commit()
+```
+
+### Dynamic Resource
+Dynamic resources execute code from CodeVault to generate content:
+
+```python
+from models import CodeVault, ResourceRegistry, get_engine
+from sqlmodel import Session
+import hashlib
+
+# Code that generates dynamic content
+code = """
+from datetime import datetime
+result = f"Generated at: {datetime.now()}"
+"""
+
+code_hash = hashlib.sha256(code.encode('utf-8')).hexdigest()
+
+engine = get_engine("sqlite:///chameleon.db")
+with Session(engine) as session:
+    # Add code to vault
+    vault = CodeVault(hash=code_hash, python_blob=code)
+    session.add(vault)
+    
+    # Register dynamic resource
+    resource = ResourceRegistry(
+        name="my_dynamic_resource",
+        uri_schema="myapp://dynamic/timestamp",
+        description="Returns current timestamp",
+        is_dynamic=True,
+        active_hash_ref=code_hash
+    )
+    session.add(resource)
+    session.commit()
+```
+
+## Adding Custom Prompts
+
+Prompts are templates that can be formatted with arguments:
+
+```python
+from models import PromptRegistry, get_engine
+from sqlmodel import Session
+
+engine = get_engine("sqlite:///chameleon.db")
+with Session(engine) as session:
+    prompt = PromptRegistry(
+        name="bug_report",
+        description="Template for filing bug reports",
+        template="Bug Report:\n\nTitle: {title}\n\nDescription: {description}\n\nSteps to reproduce:\n{steps}",
+        arguments_schema={
+            "arguments": [
+                {
+                    "name": "title",
+                    "description": "Short title for the bug",
+                    "required": True
+                },
+                {
+                    "name": "description",
+                    "description": "Detailed description of the bug",
+                    "required": True
+                },
+                {
+                    "name": "steps",
+                    "description": "Steps to reproduce the bug",
+                    "required": False
+                }
+            ]
+        }
+    )
+    session.add(prompt)
+    session.commit()
+```
         description="Doubles a number",
         input_schema={
             "type": "object",
