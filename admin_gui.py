@@ -137,8 +137,8 @@ def show_tool_registry():
                         st.success(f"Tool '{tool.tool_name}' deleted successfully!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error deleting tool: {e}")
                         session.rollback()
+                        st.error(f"Error deleting tool: {e}")
 
 
 # Add New Tool Page
@@ -231,7 +231,6 @@ def show_add_new_tool():
                     
             except Exception as e:
                 st.error(f"Error saving tool: {e}")
-                session.rollback()
 
 
 # Main App
