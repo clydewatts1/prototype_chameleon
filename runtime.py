@@ -18,8 +18,9 @@ EXECUTION CONTRACT:
 """
 
 import hashlib
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
+from mcp.types import AnyUrl
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
 
@@ -189,7 +190,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     ]
 
 
-def get_resource(uri: str, persona: str, db_session: Session) -> str:
+def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> str:
     """
     Get a resource by URI and execute if dynamic.
     
@@ -199,7 +200,7 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
     3. If dynamic, executes code from CodeVault
     
     Args:
-        uri: URI of the resource to retrieve
+        uri: URI of the resource to retrieve (string or MCP AnyUrl)
         persona: The persona/context for which to get the resource
         db_session: SQLModel Session for database access
         
@@ -210,12 +211,15 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
         ResourceNotFoundError: If the resource is not found
         SecurityError: If hash validation fails for dynamic resources
     """
+    # Convert uri to string in case it's a Pydantic AnyUrl or other type
+    uri_str = str(uri)
+    
     # Query ResourceRegistry for the resource by URI
-    statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri)
+    statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri_str)
     resource = db_session.exec(statement).first()
     
     if not resource:
-        raise ResourceNotFoundError(f"Resource with URI '{uri}' not found")
+        raise ResourceNotFoundError(f"Resource with URI '{uri_str}' not found")
     
     # If static, return the static content
     if not resource.is_dynamic:
@@ -246,7 +250,7 @@ def get_resource(uri: str, persona: str, db_session: Session) -> str:
     
     # Execute the code with uri as a parameter
     local_scope = {
-        'uri': uri,
+        'uri': uri_str,
         'persona': persona,
         'db_session': db_session,
     }
