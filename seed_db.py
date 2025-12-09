@@ -5,7 +5,7 @@ This script populates the database with sample tools for testing the MCP server.
 """
 
 import hashlib
-from sqlmodel import Session
+from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine, create_db_and_tables
 
 
@@ -22,12 +22,28 @@ def _compute_hash(code: str) -> str:
     return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
-def seed_database(database_url: str = "sqlite:///chameleon.db"):
+def _clear_database(session: Session) -> None:
+    """
+    Clear all existing data from the database.
+    
+    Args:
+        session: SQLModel session
+    """
+    # Delete in order of dependencies
+    session.exec(ToolRegistry.__table__.delete())
+    session.exec(ResourceRegistry.__table__.delete())
+    session.exec(PromptRegistry.__table__.delete())
+    session.exec(CodeVault.__table__.delete())
+    session.commit()
+
+
+def seed_database(database_url: str = "sqlite:///chameleon.db", clear_existing: bool = True):
     """
     Seed the database with sample tools.
     
     Args:
         database_url: Database connection string
+        clear_existing: If True, clear existing data before seeding
     """
     # Create engine and tables
     engine = get_engine(database_url)
@@ -38,6 +54,14 @@ def seed_database(database_url: str = "sqlite:///chameleon.db"):
     print("=" * 60)
     
     with Session(engine) as session:
+        # Clear existing data if requested
+        if clear_existing:
+            existing_tools = session.exec(select(ToolRegistry)).first()
+            if existing_tools:
+                print("\n⚠️  Clearing existing data...")
+                _clear_database(session)
+                print("✅ Database cleared")
+        
         # Sample Tool 1: Greeting function
         greeting_code = """name = arguments.get('name', 'Guest')
 result = f'Hello {name}! I am running from the database.'
