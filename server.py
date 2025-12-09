@@ -10,11 +10,32 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import (
+    Tool, 
+    TextContent, 
+    Resource, 
+    Prompt, 
+    PromptArgument, 
+    GetPromptResult,
+    PromptMessage,
+    TextResourceContents,
+    ReadResourceResult
+)
 from sqlmodel import Session
 
 from models import get_engine, create_db_and_tables
-from runtime import execute_tool, list_tools_for_persona, ToolNotFoundError, SecurityError
+from runtime import (
+    execute_tool, 
+    list_tools_for_persona, 
+    list_resources_for_persona,
+    list_prompts_for_persona,
+    get_resource,
+    get_prompt,
+    ToolNotFoundError, 
+    SecurityError,
+    ResourceNotFoundError,
+    PromptNotFoundError
+)
 
 
 # Initialize the server
@@ -148,6 +169,175 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         # Unexpected error - return generic error message
         error_text = f"Unexpected error executing tool '{name}': {str(e)}"
         return [TextContent(type="text", text=error_text)]
+
+
+@app.list_resources()
+async def handle_list_resources() -> list[Resource]:
+    """
+    List all available resources.
+    
+    Returns:
+        List of Resource objects available
+    """
+    persona = _get_persona_from_context()
+    
+    # Get resources from database
+    engine = get_db_engine()
+    with Session(engine) as session:
+        resources_data = list_resources_for_persona(persona, session)
+    
+    # Convert to MCP Resource objects
+    resources = []
+    for resource_data in resources_data:
+        resource = Resource(
+            uri=resource_data['uri'],
+            name=resource_data['name'],
+            description=resource_data.get('description'),
+            mimeType=resource_data.get('mimeType')
+        )
+        resources.append(resource)
+    
+    return resources
+
+
+@app.read_resource()
+async def handle_read_resource(uri: str) -> ReadResourceResult:
+    """
+    Read a specific resource by URI.
+    
+    Args:
+        uri: URI of the resource to read
+        
+    Returns:
+        ReadResourceResult containing the resource contents
+        
+    Raises:
+        Exception: If resource reading fails
+    """
+    persona = _get_persona_from_context()
+    
+    try:
+        # Get the resource content
+        engine = get_db_engine()
+        with Session(engine) as session:
+            content = get_resource(uri, persona, session)
+        
+        # Return as TextResourceContents
+        return ReadResourceResult(
+            contents=[
+                TextResourceContents(
+                    uri=uri,
+                    mimeType="text/plain",
+                    text=content
+                )
+            ]
+        )
+    
+    except ResourceNotFoundError as e:
+        # Resource not found - raise exception
+        raise ValueError(f"Error: {str(e)}")
+    
+    except SecurityError as e:
+        # Security validation failed
+        raise ValueError(f"Security Error: {str(e)}")
+    
+    except Exception as e:
+        # Unexpected error
+        raise ValueError(f"Unexpected error reading resource '{uri}': {str(e)}")
+
+
+@app.list_prompts()
+async def handle_list_prompts() -> list[Prompt]:
+    """
+    List all available prompts.
+    
+    Returns:
+        List of Prompt objects available
+    """
+    persona = _get_persona_from_context()
+    
+    # Get prompts from database
+    engine = get_db_engine()
+    with Session(engine) as session:
+        prompts_data = list_prompts_for_persona(persona, session)
+    
+    # Convert to MCP Prompt objects
+    prompts = []
+    for prompt_data in prompts_data:
+        # Convert arguments to PromptArgument objects
+        arguments = []
+        for arg in prompt_data.get('arguments', []):
+            arguments.append(
+                PromptArgument(
+                    name=arg['name'],
+                    description=arg.get('description'),
+                    required=arg.get('required', False)
+                )
+            )
+        
+        prompt = Prompt(
+            name=prompt_data['name'],
+            description=prompt_data.get('description'),
+            arguments=arguments if arguments else None
+        )
+        prompts.append(prompt)
+    
+    return prompts
+
+
+@app.get_prompt()
+async def handle_get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptResult:
+    """
+    Get a specific prompt by name with formatted arguments.
+    
+    Args:
+        name: Name of the prompt to get
+        arguments: Arguments to format the prompt template with
+        
+    Returns:
+        GetPromptResult containing the formatted prompt
+        
+    Raises:
+        Exception: If prompt retrieval fails
+    """
+    persona = _get_persona_from_context()
+    
+    try:
+        # Get the formatted prompt
+        engine = get_db_engine()
+        with Session(engine) as session:
+            result = get_prompt(name, arguments or {}, persona, session)
+        
+        # Convert messages to PromptMessage objects
+        messages = []
+        for msg in result['messages']:
+            messages.append(
+                PromptMessage(
+                    role=msg['role'],
+                    content=TextContent(
+                        type=msg['content']['type'],
+                        text=msg['content']['text']
+                    )
+                )
+            )
+        
+        # Return as GetPromptResult
+        return GetPromptResult(
+            description=result.get('description'),
+            messages=messages
+        )
+    
+    except PromptNotFoundError as e:
+        # Prompt not found
+        raise ValueError(f"Error: {str(e)}")
+    
+    except ValueError as e:
+        # Missing required argument
+        raise ValueError(f"Error: {str(e)}")
+    
+    except Exception as e:
+        # Unexpected error
+        raise ValueError(f"Unexpected error getting prompt '{name}': {str(e)}")
 
 
 async def main():
