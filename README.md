@@ -193,7 +193,7 @@ The Cline extension for VS Code supports MCP servers.
 
 ### Google Gemini CLI (Experimental)
 
-**Note**: As of this writing, Google's Gemini CLI does not have official MCP support. However, if/when support is added, the configuration pattern would be similar:
+**Note**: As of December 2025, Google's Gemini CLI does not have official MCP support. However, if/when support is added, the configuration pattern would likely be similar:
 
 1. **Check Gemini CLI documentation** for MCP configuration instructions.
 
@@ -201,7 +201,7 @@ The Cline extension for VS Code supports MCP servers.
 
 ```bash
 # In your shell configuration (~/.bashrc, ~/.zshrc, etc.)
-export GEMINI_MCP_SERVERS='{"chameleon":{"command":"python","args":["/absolute/path/to/prototype_chameleon/server.py"]}}'
+export GEMINI_MCP_SERVERS='{"chameleon": {"command": "python", "args": ["/absolute/path/to/prototype_chameleon/server.py"]}}'
 ```
 
 Or via a configuration file (location TBD by Google):
@@ -217,7 +217,7 @@ Or via a configuration file (location TBD by Google):
 }
 ```
 
-3. **Monitor the [Gemini CLI documentation](https://ai.google.dev/)** for official MCP support announcements.
+3. **Monitor Google AI documentation** at [https://ai.google.dev/](https://ai.google.dev/) for official MCP support announcements.
 
 ### Generic MCP Client Configuration
 
