@@ -10,34 +10,65 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
-from mcp import server
+from mcp.types import Tool, TextContent
 from sqlmodel import Session
 
 from models import get_engine, create_db_and_tables
-from runtime import execute_tool, list_tools_for_persona
+from runtime import execute_tool, list_tools_for_persona, ToolNotFoundError, SecurityError
 
 
 # Initialize the server
 app = Server('chameleon-engine')
 
-# Database setup
-engine = None
+# Database engine - initialized in lifespan
+_db_engine = None
+
+
+def get_db_engine():
+    """Get the database engine instance."""
+    if _db_engine is None:
+        raise RuntimeError("Database not initialized. Server lifespan not started.")
+    return _db_engine
 
 
 @asynccontextmanager
 async def lifespan(server_instance):
     """Initialize database on server startup."""
-    global engine
+    global _db_engine
     # Setup database
-    engine = get_engine("sqlite:///chameleon.db")
-    create_db_and_tables(engine)
+    _db_engine = get_engine("sqlite:///chameleon.db")
+    create_db_and_tables(_db_engine)
     yield
     # Cleanup can be added here if needed
 
 
 # Set up lifespan
 app.lifespan = lifespan
+
+
+def _get_persona_from_context() -> str:
+    """
+    Extract persona from request context.
+    
+    Returns:
+        The persona string, defaulting to 'default' if not found
+    """
+    # Default persona
+    persona = 'default'
+    
+    # Try to get persona from request context if available
+    # Note: The MCP Server API may not expose request_context directly
+    # This is a placeholder for future enhancement when the API supports it
+    try:
+        if hasattr(app, 'request_context') and app.request_context:
+            request_context = app.request_context
+            if hasattr(request_context, 'meta'):
+                persona = request_context.meta.get('persona', 'default')
+    except (AttributeError, Exception):
+        # If we can't get the context, use default
+        pass
+    
+    return persona
 
 
 @app.list_tools()
@@ -51,21 +82,10 @@ async def handle_list_tools() -> list[Tool]:
     Returns:
         List of Tool objects available for the current persona
     """
-    # Get the request context to extract persona
-    # For now, we'll use 'default' as the persona
-    # In a real implementation, you would extract this from headers or request metadata
-    persona = 'default'
-    
-    # Try to get persona from request context if available
-    try:
-        request_context = app.request_context
-        if request_context and hasattr(request_context, 'meta'):
-            persona = request_context.meta.get('persona', 'default')
-    except Exception:
-        # If we can't get the context, use default
-        pass
+    persona = _get_persona_from_context()
     
     # Get tools from database for this persona
+    engine = get_db_engine()
     with Session(engine) as session:
         tools_data = list_tools_for_persona(persona, session)
     
@@ -93,29 +113,41 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         
     Returns:
         List containing TextContent with the tool execution result
+        
+    Raises:
+        Exception: If tool execution fails
     """
-    # Get persona from request context (default to 'default')
-    persona = 'default'
+    persona = _get_persona_from_context()
     
     try:
-        request_context = app.request_context
-        if request_context and hasattr(request_context, 'meta'):
-            persona = request_context.meta.get('persona', 'default')
-    except Exception:
-        pass
+        # Execute the tool
+        engine = get_db_engine()
+        with Session(engine) as session:
+            result = execute_tool(name, persona, arguments, session)
+        
+        # Convert result to string if it's not already
+        if result is None:
+            result_text = "Tool executed successfully (no return value)"
+        else:
+            result_text = str(result)
+        
+        # Wrap in TextContent and return
+        return [TextContent(type="text", text=result_text)]
     
-    # Execute the tool
-    with Session(engine) as session:
-        result = execute_tool(name, persona, arguments, session)
+    except ToolNotFoundError as e:
+        # Tool not found - return helpful error message
+        error_text = f"Error: {str(e)}"
+        return [TextContent(type="text", text=error_text)]
     
-    # Convert result to string if it's not already
-    if result is None:
-        result_text = "Tool executed successfully (no return value)"
-    else:
-        result_text = str(result)
+    except SecurityError as e:
+        # Security validation failed - return error
+        error_text = f"Security Error: {str(e)}"
+        return [TextContent(type="text", text=error_text)]
     
-    # Wrap in TextContent and return
-    return [TextContent(type="text", text=result_text)]
+    except Exception as e:
+        # Unexpected error - return generic error message
+        error_text = f"Unexpected error executing tool '{name}': {str(e)}"
+        return [TextContent(type="text", text=error_text)]
 
 
 async def main():
