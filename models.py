@@ -40,19 +40,20 @@ class ToolRegistry(SQLModel, table=True):
 
 
 # Database engine setup
-# Usage: engine = create_engine("sqlite:///database.db")
+# Usage: engine = get_engine("sqlite:///database.db")
 # For production, replace with appropriate database URL
-def get_engine(database_url: str = "sqlite:///database.db"):
+def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
     """
     Create and return a database engine.
     
     Args:
         database_url: Database connection string (default: SQLite database)
+        echo: Enable SQL query logging for debugging (default: False)
         
     Returns:
         SQLModel engine instance
     """
-    engine = create_engine(database_url, echo=True)
+    engine = create_engine(database_url, echo=echo)
     return engine
 
 
