@@ -265,19 +265,6 @@ with Session(engine) as session:
     session.add(prompt)
     session.commit()
 ```
-        description="Doubles a number",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "value": {"type": "number", "description": "Value to double"}
-            },
-            "required": ["value"]
-        },
-        active_hash_ref=code_hash
-    )
-    session.add(tool)
-    session.commit()
-```
 
 ## Security Considerations
 

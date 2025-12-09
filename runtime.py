@@ -173,7 +173,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
         - uri: Resource URI
         - name: Resource name
         - description: Resource description
-        - mimeType: MIME type (optional)
+        - mimeType: MIME type (defaults to text/plain)
     """
     statement = select(ResourceRegistry)
     resources = db_session.exec(statement).all()
@@ -183,7 +183,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
             'uri': resource.uri_schema,
             'name': resource.name,
             'description': resource.description,
-            'mimeType': 'text/plain' if not resource.is_dynamic else None,
+            'mimeType': 'text/plain',  # Default MIME type for all resources
         }
         for resource in resources
     ]
