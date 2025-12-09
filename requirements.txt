@@ -1,12 +1,12 @@
 # MCP Server dependencies
-mcp>=1.0.0
+mcp>=1.23.3
 
 # Database dependencies
-sqlmodel>=0.0.8
-sqlalchemy>=2.0.0
+sqlmodel>=0.0.27
+sqlalchemy>=2.0.44
 
 # Admin GUI dependencies
-streamlit>=1.28.0
+streamlit>=1.52.1
 
 # Core dependencies - included with Python 3.12
 # asyncio (built-in)
