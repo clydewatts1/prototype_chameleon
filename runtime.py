@@ -165,7 +165,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     List all available resources for a specific persona.
     
     Args:
-        persona: The persona/context to filter resources by (currently not filtered)
+        persona: The persona/context to filter resources by
         db_session: SQLModel Session for database access
         
     Returns:
@@ -175,7 +175,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
         - description: Resource description
         - mimeType: MIME type from database
     """
-    statement = select(ResourceRegistry)
+    statement = select(ResourceRegistry).where(ResourceRegistry.target_persona == persona)
     resources = db_session.exec(statement).all()
     
     return [
@@ -263,7 +263,7 @@ def list_prompts_for_persona(persona: str, db_session: Session) -> List[Dict[str
     List all available prompts for a specific persona.
     
     Args:
-        persona: The persona/context to filter prompts by (currently not filtered)
+        persona: The persona/context to filter prompts by
         db_session: SQLModel Session for database access
         
     Returns:
@@ -272,7 +272,7 @@ def list_prompts_for_persona(persona: str, db_session: Session) -> List[Dict[str
         - description: Prompt description
         - arguments: List of argument definitions
     """
-    statement = select(PromptRegistry)
+    statement = select(PromptRegistry).where(PromptRegistry.target_persona == persona)
     prompts = db_session.exec(statement).all()
     
     return [

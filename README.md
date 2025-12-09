@@ -81,11 +81,11 @@ This creates a SQLite database (`chameleon.db`) with sample data:
 - `uppercase` - Converts text to uppercase (persona: default)
 
 **Resources:**
-- `welcome_message` - Static welcome message (chameleon://welcome)
-- `server_time` - Dynamic resource that returns current server time (chameleon://time)
+- `welcome_message` - Static welcome message (memo://welcome)
+- `server_time` - Dynamic resource that returns current server time (system://time)
 
 **Prompts:**
-- `code_review` - Template for generating code review requests
+- `review_code` - Template for generating code review requests
 
 ### 2. Run the MCP Server
 

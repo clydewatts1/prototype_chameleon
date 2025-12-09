@@ -203,45 +203,37 @@ result = text.upper()
         # Sample Resource 1: Static welcome message
         print("\n[5] Adding static resource 'welcome_message'...")
         welcome_resource = ResourceRegistry(
-            uri_schema="chameleon://welcome",
+            uri_schema="memo://welcome",
             name="welcome_message",
             description="A welcome message for the Chameleon MCP server",
             mime_type="text/plain",
             is_dynamic=False,
-            static_content="Welcome to the Chameleon MCP Server! This is a dynamic tool execution platform that stores code in a database and serves tools based on personas.",
-            active_hash_ref=None
+            static_content="Welcome to Chameleon!",
+            active_hash_ref=None,
+            target_persona="default"
         )
         session.add(welcome_resource)
         print(f"   ✅ Resource 'welcome_message' added")
         
         # Sample Prompt 1: Code review prompt
-        print("\n[6] Adding prompt 'code_review'...")
-        code_review_prompt = PromptRegistry(
-            name="code_review",
+        print("\n[6] Adding prompt 'review_code'...")
+        review_code_prompt = PromptRegistry(
+            name="review_code",
             description="Generates a code review request prompt",
-            template="Please review the following code:\n\nLanguage: {language}\nCode:\n```{language}\n{code}\n```\n\nFocus areas: {focus_areas}",
+            template="Please review this code:\n\n{code}",
             arguments_schema={
                 "arguments": [
-                    {
-                        "name": "language",
-                        "description": "The programming language of the code",
-                        "required": True
-                    },
                     {
                         "name": "code",
                         "description": "The code to review",
                         "required": True
-                    },
-                    {
-                        "name": "focus_areas",
-                        "description": "Specific areas to focus on during review",
-                        "required": False
                     }
                 ]
-            }
+            },
+            target_persona="default"
         )
-        session.add(code_review_prompt)
-        print(f"   ✅ Prompt 'code_review' added")
+        session.add(review_code_prompt)
+        print(f"   ✅ Prompt 'review_code' added")
         
         # Sample Resource 2: Dynamic resource that generates current timestamp
         print("\n[7] Adding dynamic resource 'server_time'...")
@@ -257,13 +249,14 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         session.add(server_time_vault)
         
         server_time_resource = ResourceRegistry(
-            uri_schema="chameleon://time",
+            uri_schema="system://time",
             name="server_time",
             description="Returns the current server time dynamically",
             mime_type="text/plain",
             is_dynamic=True,
             static_content=None,
-            active_hash_ref=server_time_hash
+            active_hash_ref=server_time_hash,
+            target_persona="default"
         )
         session.add(server_time_resource)
         print(f"   ✅ Resource 'server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
@@ -282,10 +275,10 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         print("  - multiply (persona: assistant)")
         print("  - uppercase (persona: default)")
         print("\nResources added:")
-        print("  - welcome_message (static)")
-        print("  - server_time (dynamic)")
+        print("  - welcome_message (static, URI: memo://welcome)")
+        print("  - server_time (dynamic, URI: system://time)")
         print("\nPrompts added:")
-        print("  - code_review")
+        print("  - review_code")
         print("\nYou can now run the MCP server with: python server.py")
 
 

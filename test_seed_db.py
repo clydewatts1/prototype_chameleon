@@ -63,10 +63,10 @@ def test_seed_database():
             # Check prompts
             print("\n4️⃣  Validating Prompts...")
             prompts = session.exec(select(PromptRegistry)).all()
-            if any(p.name == "code_review" for p in prompts):
-                print(f"   ✅ Prompt 'code_review' found")
+            if any(p.name == "review_code" for p in prompts):
+                print(f"   ✅ Prompt 'review_code' found")
             else:
-                print(f"   ❌ Prompt 'code_review' not found")
+                print(f"   ❌ Prompt 'review_code' not found")
                 return False
             
             # Check code vaults
