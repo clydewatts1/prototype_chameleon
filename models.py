@@ -4,7 +4,6 @@ Database models for the custom MCP server using SQLModel.
 This module defines the database schema for storing code and tool configurations.
 """
 
-from typing import Optional
 from sqlmodel import Field, SQLModel, create_engine, Column
 from sqlalchemy import JSON
 
