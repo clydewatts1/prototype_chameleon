@@ -20,7 +20,7 @@ EXECUTION CONTRACT:
 import hashlib
 from typing import Any, Dict, List
 from sqlmodel import Session, select
-from models import CodeVault, ToolRegistry
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
 
 class SecurityError(Exception):
@@ -30,6 +30,16 @@ class SecurityError(Exception):
 
 class ToolNotFoundError(Exception):
     """Raised when a tool is not found in the registry."""
+    pass
+
+
+class ResourceNotFoundError(Exception):
+    """Raised when a resource is not found in the registry."""
+    pass
+
+
+class PromptNotFoundError(Exception):
+    """Raised when a prompt is not found in the registry."""
     pass
 
 
@@ -148,3 +158,183 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
         }
         for tool in tools
     ]
+
+
+def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+    """
+    List all available resources for a specific persona.
+    
+    Args:
+        persona: The persona/context to filter resources by (currently not filtered)
+        db_session: SQLModel Session for database access
+        
+    Returns:
+        List of dictionaries containing resource information:
+        - uri: Resource URI
+        - name: Resource name
+        - description: Resource description
+        - mimeType: MIME type (optional)
+    """
+    statement = select(ResourceRegistry)
+    resources = db_session.exec(statement).all()
+    
+    return [
+        {
+            'uri': resource.uri_schema,
+            'name': resource.name,
+            'description': resource.description,
+            'mimeType': 'text/plain' if not resource.is_dynamic else None,
+        }
+        for resource in resources
+    ]
+
+
+def get_resource(uri: str, persona: str, db_session: Session) -> str:
+    """
+    Get a resource by URI and execute if dynamic.
+    
+    This function:
+    1. Queries ResourceRegistry to find matching resource by URI
+    2. If static, returns the static_content
+    3. If dynamic, executes code from CodeVault
+    
+    Args:
+        uri: URI of the resource to retrieve
+        persona: The persona/context for which to get the resource
+        db_session: SQLModel Session for database access
+        
+    Returns:
+        The resource content as a string
+        
+    Raises:
+        ResourceNotFoundError: If the resource is not found
+        SecurityError: If hash validation fails for dynamic resources
+    """
+    # Query ResourceRegistry for the resource by URI
+    statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri)
+    resource = db_session.exec(statement).first()
+    
+    if not resource:
+        raise ResourceNotFoundError(f"Resource with URI '{uri}' not found")
+    
+    # If static, return the static content
+    if not resource.is_dynamic:
+        return resource.static_content or ""
+    
+    # If dynamic, execute code from CodeVault
+    if not resource.active_hash_ref:
+        raise ResourceNotFoundError(
+            f"Dynamic resource '{resource.name}' has no code reference"
+        )
+    
+    # Fetch CodeVault content using the hash
+    statement = select(CodeVault).where(CodeVault.hash == resource.active_hash_ref)
+    code_vault = db_session.exec(statement).first()
+    
+    if not code_vault:
+        raise ResourceNotFoundError(
+            f"Code not found for hash '{resource.active_hash_ref}'"
+        )
+    
+    # Security: Re-hash the content and validate
+    computed_hash = _compute_hash(code_vault.python_blob)
+    if computed_hash != code_vault.hash:
+        raise SecurityError(
+            f"Hash mismatch! Expected '{code_vault.hash}', "
+            f"got '{computed_hash}'. Code may be corrupted."
+        )
+    
+    # Execute the code with uri as a parameter
+    local_scope = {
+        'uri': uri,
+        'persona': persona,
+        'db_session': db_session,
+    }
+    
+    exec(code_vault.python_blob, {}, local_scope)
+    
+    # Return the result
+    result = local_scope.get('result', '')
+    return str(result)
+
+
+def list_prompts_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+    """
+    List all available prompts for a specific persona.
+    
+    Args:
+        persona: The persona/context to filter prompts by (currently not filtered)
+        db_session: SQLModel Session for database access
+        
+    Returns:
+        List of dictionaries containing prompt information:
+        - name: Prompt name
+        - description: Prompt description
+        - arguments: List of argument definitions
+    """
+    statement = select(PromptRegistry)
+    prompts = db_session.exec(statement).all()
+    
+    return [
+        {
+            'name': prompt.name,
+            'description': prompt.description,
+            'arguments': prompt.arguments_schema.get('arguments', []),
+        }
+        for prompt in prompts
+    ]
+
+
+def get_prompt(
+    name: str,
+    arguments: Dict[str, Any],
+    persona: str,
+    db_session: Session
+) -> Dict[str, Any]:
+    """
+    Get a prompt by name and format it with arguments.
+    
+    This function:
+    1. Queries PromptRegistry for the prompt
+    2. Fetches the template
+    3. Formats the template with provided arguments
+    4. Returns formatted prompt result
+    
+    Args:
+        name: Name of the prompt to retrieve
+        arguments: Dictionary of arguments to format the template with
+        persona: The persona/context for which to get the prompt
+        db_session: SQLModel Session for database access
+        
+    Returns:
+        Dictionary with 'description' and 'messages' for GetPromptResult
+        
+    Raises:
+        PromptNotFoundError: If the prompt is not found
+    """
+    # Query PromptRegistry for the prompt
+    statement = select(PromptRegistry).where(PromptRegistry.name == name)
+    prompt = db_session.exec(statement).first()
+    
+    if not prompt:
+        raise PromptNotFoundError(f"Prompt '{name}' not found")
+    
+    # Format the template with arguments
+    try:
+        formatted_text = prompt.template.format(**arguments)
+    except KeyError as e:
+        raise ValueError(f"Missing required argument: {e}")
+    
+    # Return result in the expected format
+    return {
+        'description': prompt.description,
+        'messages': [
+            {
+                'role': 'user',
+                'content': {
+                    'type': 'text',
+                    'text': formatted_text
+                }
+            }
+        ]
+    }

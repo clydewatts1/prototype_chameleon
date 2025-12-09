@@ -6,7 +6,7 @@ This script populates the database with sample tools for testing the MCP server.
 
 import hashlib
 from sqlmodel import Session
-from models import CodeVault, ToolRegistry, get_engine, create_db_and_tables
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine, create_db_and_tables
 
 
 def _compute_hash(code: str) -> str:
@@ -176,6 +176,48 @@ result = text.upper()
         session.add(uppercase_tool)
         print(f"   ✅ Tool 'uppercase' added (hash: {uppercase_hash[:16]}...)")
         
+        # Sample Resource 1: Static welcome message
+        print("\n[5] Adding static resource 'welcome_message'...")
+        welcome_resource = ResourceRegistry(
+            name="welcome_message",
+            uri_schema="chameleon://welcome",
+            description="A welcome message for the Chameleon MCP server",
+            is_dynamic=False,
+            static_content="Welcome to the Chameleon MCP Server! This is a dynamic tool execution platform that stores code in a database and serves tools based on personas.",
+            active_hash_ref=None
+        )
+        session.add(welcome_resource)
+        print(f"   ✅ Resource 'welcome_message' added")
+        
+        # Sample Prompt 1: Code review prompt
+        print("\n[6] Adding prompt 'code_review'...")
+        code_review_prompt = PromptRegistry(
+            name="code_review",
+            description="Generates a code review request prompt",
+            template="Please review the following code:\n\nLanguage: {language}\nCode:\n```{language}\n{code}\n```\n\nFocus areas: {focus_areas}",
+            arguments_schema={
+                "arguments": [
+                    {
+                        "name": "language",
+                        "description": "The programming language of the code",
+                        "required": True
+                    },
+                    {
+                        "name": "code",
+                        "description": "The code to review",
+                        "required": True
+                    },
+                    {
+                        "name": "focus_areas",
+                        "description": "Specific areas to focus on during review",
+                        "required": False
+                    }
+                ]
+            }
+        )
+        session.add(code_review_prompt)
+        print(f"   ✅ Prompt 'code_review' added")
+        
         # Commit all changes
         session.commit()
         
@@ -189,6 +231,10 @@ result = text.upper()
         print("  - add (persona: default)")
         print("  - multiply (persona: assistant)")
         print("  - uppercase (persona: default)")
+        print("\nResources added:")
+        print("  - welcome_message (static)")
+        print("\nPrompts added:")
+        print("  - code_review")
         print("\nYou can now run the MCP server with: python server.py")
 
 
