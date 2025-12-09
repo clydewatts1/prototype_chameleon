@@ -5,6 +5,9 @@ mcp>=1.0.0
 sqlmodel>=0.0.8
 sqlalchemy>=2.0.0
 
+# Admin GUI dependencies
+streamlit>=1.28.0
+
 # Core dependencies - included with Python 3.12
 # asyncio (built-in)
 # hashlib (built-in)
