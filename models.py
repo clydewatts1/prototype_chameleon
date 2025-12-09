@@ -52,6 +52,9 @@ class ResourceRegistry(SQLModel, table=True):
     is_dynamic: bool = Field(default=False, description="If True, executes code from CodeVault")
     static_content: str | None = Field(default=None, description="Hardcoded content for static resources")
     active_hash_ref: str | None = Field(default=None, foreign_key="codevault.hash", nullable=True, description="Ref to CodeVault if dynamic")
+    
+    # Persona support
+    target_persona: str = Field(default="default", description="Target persona for the resource")
 
 
 class PromptRegistry(SQLModel, table=True):
@@ -63,6 +66,9 @@ class PromptRegistry(SQLModel, table=True):
     description: str = Field(description="What this prompt does")
     template: str = Field(description="The Jinja2 or f-string template")
     arguments_schema: dict = Field(sa_column=Column(JSON), description="JSON Schema for arguments")
+    
+    # Persona support
+    target_persona: str = Field(default="default", description="Target persona for the prompt")
 
 
 # Database engine setup
