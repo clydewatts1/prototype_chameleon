@@ -8,6 +8,7 @@ based on persona stored in the database.
 import asyncio
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -78,7 +79,7 @@ def setup_logging():
                 old_file.unlink()
             except OSError as e:
                 # If we can't delete a file, just log it to stderr
-                print(f"Warning: Could not delete old log file {old_file}: {e}", file=__import__('sys').stderr)
+                print(f"Warning: Could not delete old log file {old_file}: {e}", file=sys.stderr)
     
     # Configure root logger
     root_logger = logging.getLogger()
