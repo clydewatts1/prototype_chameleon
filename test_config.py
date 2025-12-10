@@ -30,6 +30,7 @@ def test_default_config():
             assert config['server']['host'] == '0.0.0.0', "❌ Wrong default host"
             assert config['server']['port'] == 8000, "❌ Wrong default port"
             assert config['server']['log_level'] == 'INFO', "❌ Wrong default log_level"
+            assert config['server']['logs_dir'] == 'logs', "❌ Wrong default logs_dir"
             print("✅ Server defaults are correct")
             
             # Validate database defaults

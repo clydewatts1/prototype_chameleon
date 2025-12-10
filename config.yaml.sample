@@ -13,6 +13,10 @@ server:
   
   # Logging level: DEBUG, INFO, WARNING, ERROR, or CRITICAL
   log_level: "INFO"
+  
+  # Directory path for log files (default: "logs")
+  # Can be absolute or relative to the current working directory
+  logs_dir: "logs"
 
 database:
   # Database connection URL
