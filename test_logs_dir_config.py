@@ -166,11 +166,11 @@ server:
             return True
             
         finally:
-            # Restore original HOME
-            if original_home:
+            # Restore original HOME environment variable
+            if original_home is not None:
                 os.environ['HOME'] = original_home
-            else:
-                os.environ.pop('HOME', None)
+            elif 'HOME' in os.environ:
+                del os.environ['HOME']
 
 
 if __name__ == "__main__":
