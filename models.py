@@ -19,6 +19,23 @@ _schema_name = _db_config.get('schema')
 _schema_arg = {"schema": _schema_name} if _schema_name else None
 
 
+def _get_foreign_key(table_key: str, column: str = 'hash') -> str:
+    """
+    Construct a foreign key reference with optional schema prefix.
+    
+    Args:
+        table_key: The logical table name key (e.g., 'code_vault')
+        column: The column name to reference (default: 'hash')
+        
+    Returns:
+        Foreign key reference string (e.g., 'schema.tablename.column' or 'tablename.column')
+    """
+    table_name = _table_config.get(table_key, table_key)
+    if _schema_name:
+        return f"{_schema_name}.{table_name}.{column}"
+    return f"{table_name}.{column}"
+
+
 class SalesPerDay(SQLModel, table=True):
     """
     Table for storing daily sales data.
@@ -76,7 +93,7 @@ class ToolRegistry(SQLModel, table=True):
     description: str = Field(description="Description of what the tool does")
     input_schema: dict = Field(sa_column=Column(JSON), description="JSON Schema for the tool arguments")
     active_hash_ref: str = Field(
-        foreign_key=f"{_schema_name + '.' if _schema_name else ''}{_table_config.get('code_vault', 'codevault')}.hash",
+        foreign_key=_get_foreign_key('code_vault', 'hash'),
         description="Reference to CodeVault hash"
     )
 
@@ -99,7 +116,7 @@ class ResourceRegistry(SQLModel, table=True):
     static_content: str | None = Field(default=None, description="Hardcoded content for static resources")
     active_hash_ref: str | None = Field(
         default=None,
-        foreign_key=f"{_schema_name + '.' if _schema_name else ''}{_table_config.get('code_vault', 'codevault')}.hash",
+        foreign_key=_get_foreign_key('code_vault', 'hash'),
         nullable=True,
         description="Ref to CodeVault if dynamic"
     )
