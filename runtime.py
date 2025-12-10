@@ -117,6 +117,14 @@ def execute_tool(
     # Execute based on code type
     if code_vault.code_type == 'select':
         # Execute SQL SELECT statement
+        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
+        # Raw SQL execution without parameterization or validation can be
+        # dangerous if CodeVault contains untrusted code. For production with
+        # untrusted code, consider:
+        # - Query whitelisting or validation
+        # - Read-only database connections for SELECT operations
+        # - Parameterized query templates
+        # - Running queries in isolated database contexts
         from sqlalchemy import text
         result = db_session.exec(text(code_vault.code_blob)).all()
         return result
@@ -259,6 +267,14 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
     # Execute based on code type
     if code_vault.code_type == 'select':
         # Execute SQL SELECT statement
+        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
+        # Raw SQL execution without parameterization or validation can be
+        # dangerous if CodeVault contains untrusted code. For production with
+        # untrusted code, consider:
+        # - Query whitelisting or validation
+        # - Read-only database connections for SELECT operations
+        # - Parameterized query templates
+        # - Running queries in isolated database contexts
         from sqlalchemy import text
         result = db_session.exec(text(code_vault.code_blob)).all()
         return str(result)
