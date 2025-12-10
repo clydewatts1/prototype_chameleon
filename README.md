@@ -64,30 +64,7 @@ The project consists of four main components:
 
 ## Usage
 
-### 1. Seed the Database
-
-Before running the server, populate the database with sample tools:
-
-```bash
-python seed_db.py
-```
-
-This creates a SQLite database (`chameleon.db`) with sample data:
-
-**Tools:**
-- `greet` - Greets a person by name (persona: default)
-- `add` - Adds two numbers (persona: default)
-- `multiply` - Multiplies two numbers (persona: assistant)
-- `uppercase` - Converts text to uppercase (persona: default)
-
-**Resources:**
-- `welcome_message` - Static welcome message (memo://welcome)
-- `server_time` - Dynamic resource that returns current server time (system://time)
-
-**Prompts:**
-- `review_code` - Template for generating code review requests
-
-### 2. Run the MCP Server
+### 1. Run the MCP Server
 
 Start the server using stdio transport:
 
@@ -98,7 +75,37 @@ python server.py
 The server will:
 - Initialize the database connection
 - Create tables if they don't exist
+- **Automatically seed the database with sample data if empty** (new in this version!)
 - Start listening for MCP requests on stdio
+
+**Auto-Seeding**: On first run, the server automatically populates the database with sample tools, resources, and prompts. This means you can start using the server immediately without manually running `seed_db.py`.
+
+**Sample Data Included:**
+
+**Tools:**
+- `greet` - Greets a person by name (persona: default)
+- `add` - Adds two numbers (persona: default)
+- `multiply` - Multiplies two numbers (persona: assistant)
+- `uppercase` - Converts text to uppercase (persona: default)
+- `get_sales_summary` - Get sales summary using SQL SELECT (persona: default)
+
+**Resources:**
+- `welcome_message` - Static welcome message (memo://welcome)
+- `server_time` - Dynamic resource that returns current server time (system://time)
+- `sales_report` - Recent sales report (data://sales/recent)
+
+**Prompts:**
+- `review_code` - Template for generating code review requests
+
+### 2. Manually Seed the Database (Optional)
+
+If you want to reset the database or manually populate it with fresh sample data:
+
+```bash
+python seed_db.py
+```
+
+This will clear existing data and repopulate the database with sample tools, resources, and prompts.
 
 ### 3. Run the Admin GUI (Optional)
 
@@ -240,7 +247,7 @@ After configuring your AI client:
 If tools don't appear, check:
 - Server path is correct and absolute
 - Python environment has required dependencies installed
-- Database file exists and contains seeded data
+- Server has write permissions to create the database file (auto-seeded on first run)
 - Client logs for connection errors
 
 ### Using Virtual Environments
@@ -455,11 +462,11 @@ prototype_chameleon/
 
 ### Running Tests
 
-Currently, the project uses manual testing via `seed_db.py` and running the server. To test:
+Currently, the project uses manual testing. To test:
 
-1. Seed the database: `python seed_db.py`
-2. Run the server: `python server.py`
-3. Send MCP requests to test tool listing and execution
+1. Run the server: `python server.py` (database will be auto-seeded on first run)
+2. Send MCP requests to test tool listing and execution
+3. Optionally, reset the database: `python seed_db.py`
 
 ## Personas
 
