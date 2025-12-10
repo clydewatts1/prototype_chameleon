@@ -130,15 +130,17 @@ def show_tool_registry():
                 st.write("**Description:**")
                 st.write(tool.description)
                 
-                st.write("**Python Code:**")
-                # Fetch python code from CodeVault
+                st.write("**Code:**")
+                # Fetch code from CodeVault
                 code_statement = select(CodeVault).where(
                     CodeVault.hash == tool.active_hash_ref
                 )
                 code_vault = session.exec(code_statement).first()
                 
                 if code_vault:
-                    st.code(code_vault.python_blob, language="python")
+                    language = "python" if code_vault.code_type == "python" else "sql"
+                    st.code(code_vault.code_blob, language=language)
+                    st.caption(f"Code Type: {code_vault.code_type}")
                 else:
                     st.error(f"Code not found for hash: {tool.active_hash_ref}")
                 
@@ -170,10 +172,21 @@ def show_add_new_tool():
         target_persona = st.text_input("Target Persona *", placeholder="e.g., default, assistant, etc.")
         description = st.text_area("Description *", placeholder="Describe what this tool does...")
         
-        st.write("**Python Code Editor:**")
+        st.write("**Code Editor:**")
+        code_type = st.selectbox(
+            "Code Type *",
+            options=["python", "select"],
+            help="Select 'python' for Python code or 'select' for SQL SELECT statements"
+        )
+        
+        if code_type == "python":
+            placeholder_text = "# Your Python code here\n# Access arguments with: arguments.get('param_name')\n# Set result with: result = your_value"
+        else:
+            placeholder_text = "-- Your SQL SELECT statement here\n-- Example: SELECT * FROM table_name WHERE column = value"
+        
         code = st.text_area(
-            "Python Logic *",
-            placeholder="# Your Python code here\n# Access arguments with: arguments.get('param_name')\n# Set result with: result = your_value",
+            "Code Logic *",
+            placeholder=placeholder_text,
             height=200
         )
         
@@ -211,7 +224,7 @@ def show_add_new_tool():
                     
                     if not existing_code:
                         # Insert new code into CodeVault
-                        new_code = CodeVault(hash=code_hash, python_blob=code)
+                        new_code = CodeVault(hash=code_hash, code_blob=code, code_type=code_type)
                         session.add(new_code)
                         st.info(f"New code blob added with hash: {code_hash[:16]}...")
                     else:
@@ -300,8 +313,8 @@ def show_resource_registry():
                 if resource.is_dynamic:
                     st.write("🔄 Dynamic (code-generated)")
                     
-                    st.write("**Python Code:**")
-                    # Fetch python code from CodeVault
+                    st.write("**Code:**")
+                    # Fetch code from CodeVault
                     if resource.active_hash_ref:
                         code_statement = select(CodeVault).where(
                             CodeVault.hash == resource.active_hash_ref
@@ -309,7 +322,9 @@ def show_resource_registry():
                         code_vault = session.exec(code_statement).first()
                         
                         if code_vault:
-                            st.code(code_vault.python_blob, language="python")
+                            language = "python" if code_vault.code_type == "python" else "sql"
+                            st.code(code_vault.code_blob, language=language)
+                            st.caption(f"Code Type: {code_vault.code_type}")
                         else:
                             st.error(f"Code not found for hash: {resource.active_hash_ref}")
                     else:
@@ -356,10 +371,22 @@ def show_add_new_resource():
         is_dynamic = st.checkbox("Is Dynamic (executes code)?", value=False)
         
         if is_dynamic:
-            st.write("**Dynamic Resource - Python Code Editor:**")
+            st.write("**Dynamic Resource - Code Editor:**")
+            code_type = st.selectbox(
+                "Code Type *",
+                options=["python", "select"],
+                help="Select 'python' for Python code or 'select' for SQL SELECT statements",
+                key="resource_code_type"
+            )
+            
+            if code_type == "python":
+                placeholder_text = "# Your Python code here\n# Set result variable to return a value\n# Example:\n# from datetime import datetime\n# result = f'Time: {datetime.now()}'"
+            else:
+                placeholder_text = "-- Your SQL SELECT statement here\n-- Example: SELECT * FROM table_name WHERE column = value"
+            
             code = st.text_area(
-                "Python Logic *",
-                placeholder="# Your Python code here\n# Set result variable to return a value\n# Example:\n# from datetime import datetime\n# result = f'Time: {datetime.now()}'",
+                "Code Logic *",
+                placeholder=placeholder_text,
                 height=200,
                 key="resource_code"
             )
@@ -404,7 +431,7 @@ def show_add_new_resource():
                         
                         if not existing_code:
                             # Insert new code into CodeVault
-                            new_code = CodeVault(hash=code_hash, python_blob=code)
+                            new_code = CodeVault(hash=code_hash, code_blob=code, code_type=code_type)
                             session.add(new_code)
                             st.info(f"New code blob added with hash: {code_hash[:16]}...")
                         else:

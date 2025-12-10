@@ -6,6 +6,27 @@ This module defines the database schema for storing code and tool configurations
 
 from sqlmodel import Field, SQLModel, create_engine, Column
 from sqlalchemy import JSON
+from datetime import date
+
+
+class SalesPerDay(SQLModel, table=True):
+    """
+    Table for storing daily sales data.
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        business_date: Date of the sales transaction
+        store_name: Name of the store
+        department: Department name
+        sales_amount: Sales amount in dollars
+    """
+    __tablename__ = "sales_per_day"
+    
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    business_date: date = Field(description="Date of the sales transaction")
+    store_name: str = Field(description="Name of the store")
+    department: str = Field(description="Department name")
+    sales_amount: float = Field(description="Sales amount in dollars")
 
 
 class CodeVault(SQLModel, table=True):
@@ -14,10 +35,12 @@ class CodeVault(SQLModel, table=True):
     
     Attributes:
         hash: SHA-256 hash of the code (Primary Key)
-        python_blob: The executable code as text
+        code_blob: The executable code as text
+        code_type: Type of code ('python' or 'select')
     """
     hash: str = Field(primary_key=True, description="SHA-256 hash of the code")
-    python_blob: str = Field(description="The executable code")
+    code_blob: str = Field(description="The executable code")
+    code_type: str = Field(default="python", description="Type of code: 'python' or 'select'")
 
 
 class ToolRegistry(SQLModel, table=True):

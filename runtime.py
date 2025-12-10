@@ -20,6 +20,7 @@ EXECUTION CONTRACT:
 import hashlib
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
+from sqlalchemy import text
 from mcp.types import AnyUrl
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
@@ -107,31 +108,46 @@ def execute_tool(
         )
     
     # Security: Re-hash the content and validate
-    computed_hash = _compute_hash(code_vault.python_blob)
+    computed_hash = _compute_hash(code_vault.code_blob)
     if computed_hash != code_vault.hash:
         raise SecurityError(
             f"Hash mismatch! Expected '{code_vault.hash}', "
             f"got '{computed_hash}'. Code may be corrupted."
         )
     
-    # Sandbox: Execute the code
-    # Create a local scope with arguments and db_session
-    # NOTE: As per requirements, exec() is used for execution and db_session
-    # is passed directly. For production with untrusted code, consider:
-    # - Using RestrictedPython or similar sandboxing
-    # - Implementing a restricted database interface layer
-    # - Running code in isolated containers/processes
-    local_scope = {
-        'arguments': arguments,
-        'db_session': db_session,
-    }
-    
-    # Execute the code in the local scope
-    # The code should set a 'result' variable to return a value
-    exec(code_vault.python_blob, {}, local_scope)
-    
-    # Return the result if the code defines a 'result' variable
-    return local_scope.get('result')
+    # Execute based on code type
+    if code_vault.code_type == 'select':
+        # Execute SQL SELECT statement
+        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
+        # Raw SQL execution without parameterization or validation can be
+        # dangerous if CodeVault contains untrusted code. For production with
+        # untrusted code, consider:
+        # - Query whitelisting or validation
+        # - Read-only database connections for SELECT operations
+        # - Parameterized query templates
+        # - Running queries in isolated database contexts
+        result = db_session.exec(text(code_vault.code_blob)).all()
+        return result
+    else:
+        # Default to python execution
+        # Sandbox: Execute the code
+        # Create a local scope with arguments and db_session
+        # NOTE: As per requirements, exec() is used for execution and db_session
+        # is passed directly. For production with untrusted code, consider:
+        # - Using RestrictedPython or similar sandboxing
+        # - Implementing a restricted database interface layer
+        # - Running code in isolated containers/processes
+        local_scope = {
+            'arguments': arguments,
+            'db_session': db_session,
+        }
+        
+        # Execute the code in the local scope
+        # The code should set a 'result' variable to return a value
+        exec(code_vault.code_blob, {}, local_scope)
+        
+        # Return the result if the code defines a 'result' variable
+        return local_scope.get('result')
 
 
 def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
@@ -241,25 +257,40 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
         )
     
     # Security: Re-hash the content and validate
-    computed_hash = _compute_hash(code_vault.python_blob)
+    computed_hash = _compute_hash(code_vault.code_blob)
     if computed_hash != code_vault.hash:
         raise SecurityError(
             f"Hash mismatch! Expected '{code_vault.hash}', "
             f"got '{computed_hash}'. Code may be corrupted."
         )
     
-    # Execute the code with uri as a parameter
-    local_scope = {
-        'uri': uri_str,
-        'persona': persona,
-        'db_session': db_session,
-    }
-    
-    exec(code_vault.python_blob, {}, local_scope)
-    
-    # Return the result
-    result = local_scope.get('result', '')
-    return str(result)
+    # Execute based on code type
+    if code_vault.code_type == 'select':
+        # Execute SQL SELECT statement
+        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
+        # Raw SQL execution without parameterization or validation can be
+        # dangerous if CodeVault contains untrusted code. For production with
+        # untrusted code, consider:
+        # - Query whitelisting or validation
+        # - Read-only database connections for SELECT operations
+        # - Parameterized query templates
+        # - Running queries in isolated database contexts
+        result = db_session.exec(text(code_vault.code_blob)).all()
+        return str(result)
+    else:
+        # Default to python execution
+        # Execute the code with uri as a parameter
+        local_scope = {
+            'uri': uri_str,
+            'persona': persona,
+            'db_session': db_session,
+        }
+        
+        exec(code_vault.code_blob, {}, local_scope)
+        
+        # Return the result
+        result = local_scope.get('result', '')
+        return str(result)
 
 
 def list_prompts_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
