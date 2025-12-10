@@ -89,6 +89,7 @@ server:
   host: "0.0.0.0"     # Host for SSE transport
   port: 8000          # Port for SSE transport
   log_level: "INFO"   # DEBUG, INFO, WARNING, ERROR, or CRITICAL
+  logs_dir: "logs"    # Directory for log files (relative or absolute path)
 
 database:
   url: "sqlite:///chameleon.db"  # Database connection URL
@@ -101,6 +102,7 @@ If no config file exists, the server uses these defaults:
 - Host: 0.0.0.0
 - Port: 8000
 - Log Level: INFO
+- Logs Directory: logs
 - Database: sqlite:///chameleon.db
 
 **Command-Line Overrides:**
@@ -116,6 +118,9 @@ python server.py --database-url postgresql://user:pass@localhost/mydb
 
 # Override log level
 python server.py --log-level DEBUG
+
+# Override logs directory
+python server.py --logs-dir /var/log/chameleon
 
 # See all options
 python server.py --help
