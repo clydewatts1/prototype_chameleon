@@ -1,0 +1,23 @@
+# Chameleon MCP Server Configuration
+#
+# This is a sample configuration file. Copy this to ~/.chameleon/config/config.yaml
+# and customize it for your needs.
+
+server:
+  # Transport type: "stdio" or "sse"
+  transport: "stdio"
+  
+  # Host and port for SSE transport (ignored for stdio)
+  host: "0.0.0.0"
+  port: 8000
+  
+  # Logging level: DEBUG, INFO, WARNING, ERROR, or CRITICAL
+  log_level: "INFO"
+
+database:
+  # Database connection URL
+  # Examples:
+  #   SQLite: "sqlite:///chameleon.db"
+  #   PostgreSQL: "postgresql://user:password@localhost/dbname"
+  #   MySQL: "mysql://user:password@localhost/dbname"
+  url: "sqlite:///chameleon.db"

@@ -64,7 +64,66 @@ The project consists of four main components:
 
 ## Usage
 
-### 1. Run the MCP Server
+### 1. Configuration (Optional)
+
+The server uses a YAML-based configuration system. You can configure the server by creating a config file at `~/.chameleon/config/config.yaml`.
+
+**Create Configuration:**
+
+```bash
+# Create the config directory
+mkdir -p ~/.chameleon/config
+
+# Copy the sample config file
+cp config.yaml.sample ~/.chameleon/config/config.yaml
+
+# Edit the config file with your preferred settings
+nano ~/.chameleon/config/config.yaml
+```
+
+**Configuration Structure:**
+
+```yaml
+server:
+  transport: "stdio"  # or "sse" for HTTP Server-Sent Events
+  host: "0.0.0.0"     # Host for SSE transport
+  port: 8000          # Port for SSE transport
+  log_level: "INFO"   # DEBUG, INFO, WARNING, ERROR, or CRITICAL
+
+database:
+  url: "sqlite:///chameleon.db"  # Database connection URL
+```
+
+**Default Behavior:**
+
+If no config file exists, the server uses these defaults:
+- Transport: stdio
+- Host: 0.0.0.0
+- Port: 8000
+- Log Level: INFO
+- Database: sqlite:///chameleon.db
+
+**Command-Line Overrides:**
+
+You can override any config value using command-line arguments:
+
+```bash
+# Override transport and port
+python server.py --transport sse --port 9000
+
+# Override database URL
+python server.py --database-url postgresql://user:pass@localhost/mydb
+
+# Override log level
+python server.py --log-level DEBUG
+
+# See all options
+python server.py --help
+```
+
+**Priority:** Command-line arguments > YAML config > Defaults
+
+### 2. Run the MCP Server
 
 Start the server using stdio transport:
 
@@ -72,11 +131,18 @@ Start the server using stdio transport:
 python server.py
 ```
 
+Or with SSE transport:
+
+```bash
+python server.py --transport sse --port 8000
+```
+
 The server will:
+- Load configuration from `~/.chameleon/config/config.yaml` (if it exists)
 - Initialize the database connection
 - Create tables if they don't exist
 - **Automatically seed the database with sample data if empty** (new in this version!)
-- Start listening for MCP requests on stdio
+- Start listening for MCP requests on the configured transport
 
 **Auto-Seeding**: On first run, the server automatically populates the database with sample tools, resources, and prompts. This means you can start using the server immediately without manually running `seed_db.py`.
 
@@ -97,7 +163,7 @@ The server will:
 **Prompts:**
 - `review_code` - Template for generating code review requests
 
-### 2. Manually Seed the Database (Optional)
+### 3. Manually Seed the Database (Optional)
 
 If you want to reset the database or manually populate it with fresh sample data:
 
@@ -107,7 +173,7 @@ python seed_db.py
 
 This will clear existing data and repopulate the database with sample tools, resources, and prompts.
 
-### 3. Run the Admin GUI (Optional)
+### 4. Run the Admin GUI (Optional)
 
 Manage your tools and database using the Streamlit admin interface:
 
@@ -120,14 +186,26 @@ The admin GUI provides:
 - **Tool Registry**: Browse, filter by persona, and delete tools
 - **Add New Tool**: Create or update tools with a user-friendly form
 
-By default, the GUI connects to `sqlite:///chameleon.db`. To use a different database:
+**Database Connection:**
+
+The admin GUI uses the same configuration system as the server:
+
+1. **CHAMELEON_DB_URL environment variable** (highest priority)
+2. **~/.chameleon/config/config.yaml** config file
+3. **Default:** `sqlite:///chameleon.db`
+
+Examples:
 
 ```bash
+# Use environment variable
 export CHAMELEON_DB_URL="postgresql://user:pass@host/db"
+streamlit run admin_gui.py
+
+# Or use the config file (create ~/.chameleon/config/config.yaml)
 streamlit run admin_gui.py
 ```
 
-### 4. Interact with the Server
+### 5. Interact with the Server
 
 The server implements the MCP protocol and supports:
 
@@ -438,35 +516,72 @@ with Session(engine) as session:
 
 The server uses SQLite by default (`chameleon.db`). The database file is automatically created on first run.
 
-To use a different database:
-- **Admin GUI**: Set the `CHAMELEON_DB_URL` environment variable (e.g., `export CHAMELEON_DB_URL="postgresql://user:pass@host/db"`)
-- **MCP Server**: Modify the connection string in `server.py`, in the `lifespan` function
-- **Seed Script**: Modify the default parameter in `seed_db.py`, in the `seed_database` function
+**Configuration Methods (in priority order):**
 
-Supported databases: Any SQLAlchemy-compatible database (PostgreSQL, MySQL, etc.)
+1. **Command-line argument:**
+   ```bash
+   python server.py --database-url "postgresql://user:pass@host/db"
+   ```
+
+2. **YAML configuration file** (`~/.chameleon/config/config.yaml`):
+   ```yaml
+   database:
+     url: "postgresql://user:pass@host/db"
+   ```
+
+3. **Environment variable** (for Admin GUI backward compatibility):
+   ```bash
+   export CHAMELEON_DB_URL="postgresql://user:pass@host/db"
+   streamlit run admin_gui.py
+   ```
+
+4. **Default:** `sqlite:///chameleon.db`
+
+**Supported databases:** Any SQLAlchemy-compatible database (SQLite, PostgreSQL, MySQL, etc.)
+
+**Examples:**
+
+```yaml
+# SQLite (default)
+database:
+  url: "sqlite:///chameleon.db"
+
+# PostgreSQL
+database:
+  url: "postgresql://username:password@localhost:5432/chameleon"
+
+# MySQL
+database:
+  url: "mysql://username:password@localhost:3306/chameleon"
+```
 
 ## Development
 
 ### Project Structure
 ```
 prototype_chameleon/
-├── README.md           # This file
-├── requirements.txt    # Python dependencies
-├── models.py          # Database models (CodeVault, ToolRegistry)
-├── runtime.py         # Code execution engine
-├── server.py          # MCP server implementation
-├── seed_db.py         # Database seeding script
-├── admin_gui.py       # Streamlit admin GUI
-└── .gitignore         # Git ignore patterns
+├── README.md              # This file
+├── requirements.txt       # Python dependencies
+├── config.py             # Configuration module (YAML config loading)
+├── config.yaml.sample    # Sample configuration file
+├── models.py             # Database models (CodeVault, ToolRegistry, etc.)
+├── runtime.py            # Code execution engine
+├── server.py             # MCP server implementation
+├── seed_db.py            # Database seeding script
+├── admin_gui.py          # Streamlit admin GUI
+├── test_config.py        # Configuration module tests
+├── test_seed_db.py       # Database seeding tests
+├── test_logging.py       # Logging tests
+└── .gitignore            # Git ignore patterns
 ```
 
 ### Running Tests
 
-Currently, the project uses manual testing. To test:
+The project includes several test scripts:
 
-1. Run the server: `python server.py` (database will be auto-seeded on first run)
-2. Send MCP requests to test tool listing and execution
-3. Optionally, reset the database: `python seed_db.py`
+1. **Configuration tests:** `python test_config.py`
+2. **Database seeding tests:** `python test_seed_db.py`
+3. **Server tests:** `python server.py` (database will be auto-seeded on first run)
 
 ## Personas
 
