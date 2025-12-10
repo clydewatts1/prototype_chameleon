@@ -7,6 +7,16 @@ This module defines the database schema for storing code and tool configurations
 from sqlmodel import Field, SQLModel, create_engine, Column
 from sqlalchemy import JSON
 from datetime import date
+from config import load_config
+
+# Load configuration at module level
+_config = load_config()
+_db_config = _config.get('database', {})
+_table_config = _config.get('tables', {})
+
+# Determine schema argument for all tables
+_schema_name = _db_config.get('schema')
+_schema_arg = {"schema": _schema_name} if _schema_name else None
 
 
 class SalesPerDay(SQLModel, table=True):
@@ -20,7 +30,8 @@ class SalesPerDay(SQLModel, table=True):
         department: Department name
         sales_amount: Sales amount in dollars
     """
-    __tablename__ = "sales_per_day"
+    __tablename__ = _table_config.get('sales_per_day', 'sales_per_day')
+    __table_args__ = _schema_arg
     
     id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
     business_date: date = Field(description="Date of the sales transaction")
@@ -38,6 +49,9 @@ class CodeVault(SQLModel, table=True):
         code_blob: The executable code as text
         code_type: Type of code ('python' or 'select')
     """
+    __tablename__ = _table_config.get('code_vault', 'codevault')
+    __table_args__ = _schema_arg
+    
     hash: str = Field(primary_key=True, description="SHA-256 hash of the code")
     code_blob: str = Field(description="The executable code")
     code_type: str = Field(default="python", description="Type of code: 'python' or 'select'")
@@ -54,11 +68,17 @@ class ToolRegistry(SQLModel, table=True):
         input_schema: JSON Schema for the tool arguments (stored as dict/JSON)
         active_hash_ref: Foreign key reference to CodeVault hash
     """
+    __tablename__ = _table_config.get('tool_registry', 'toolregistry')
+    __table_args__ = _schema_arg
+    
     tool_name: str = Field(primary_key=True, description="Name of the tool")
     target_persona: str = Field(primary_key=True, description="Target persona for the tool")
     description: str = Field(description="Description of what the tool does")
     input_schema: dict = Field(sa_column=Column(JSON), description="JSON Schema for the tool arguments")
-    active_hash_ref: str = Field(foreign_key="codevault.hash", description="Reference to CodeVault hash")
+    active_hash_ref: str = Field(
+        foreign_key=f"{_schema_name + '.' if _schema_name else ''}{_table_config.get('code_vault', 'codevault')}.hash",
+        description="Reference to CodeVault hash"
+    )
 
 
 class ResourceRegistry(SQLModel, table=True):
@@ -66,6 +86,9 @@ class ResourceRegistry(SQLModel, table=True):
     Table for registering Resources.
     Resources can be static (text stored here) or dynamic (code in CodeVault).
     """
+    __tablename__ = _table_config.get('resource_registry', 'resourceregistry')
+    __table_args__ = _schema_arg
+    
     uri_schema: str = Field(primary_key=True, description="The URI pattern (e.g. 'note://{id}')")
     name: str = Field(description="Human readable name")
     description: str = Field(description="Description of the resource")
@@ -74,7 +97,12 @@ class ResourceRegistry(SQLModel, table=True):
     # Dynamic vs Static
     is_dynamic: bool = Field(default=False, description="If True, executes code from CodeVault")
     static_content: str | None = Field(default=None, description="Hardcoded content for static resources")
-    active_hash_ref: str | None = Field(default=None, foreign_key="codevault.hash", nullable=True, description="Ref to CodeVault if dynamic")
+    active_hash_ref: str | None = Field(
+        default=None,
+        foreign_key=f"{_schema_name + '.' if _schema_name else ''}{_table_config.get('code_vault', 'codevault')}.hash",
+        nullable=True,
+        description="Ref to CodeVault if dynamic"
+    )
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the resource")
@@ -85,6 +113,9 @@ class PromptRegistry(SQLModel, table=True):
     Table for registering Prompts.
     Prompts are templates that the LLM can request.
     """
+    __tablename__ = _table_config.get('prompt_registry', 'promptregistry')
+    __table_args__ = _schema_arg
+    
     name: str = Field(primary_key=True, description="Name of the prompt (e.g. 'review_code')")
     description: str = Field(description="What this prompt does")
     template: str = Field(description="The Jinja2 or f-string template")

@@ -26,7 +26,15 @@ def get_default_config() -> Dict[str, Any]:
             'logs_dir': 'logs'
         },
         'database': {
-            'url': 'sqlite:///chameleon.db'
+            'url': 'sqlite:///chameleon.db',
+            'schema': None
+        },
+        'tables': {
+            'code_vault': 'codevault',
+            'tool_registry': 'toolregistry',
+            'resource_registry': 'resourceregistry',
+            'prompt_registry': 'promptregistry',
+            'sales_per_day': 'sales_per_day'
         }
     }
 
@@ -67,6 +75,10 @@ def load_config() -> Dict[str, Any]:
             # Update database settings
             if 'database' in yaml_config:
                 config['database'].update(yaml_config['database'])
+            
+            # Update table settings
+            if 'tables' in yaml_config:
+                config['tables'].update(yaml_config['tables'])
         
         return config
     
