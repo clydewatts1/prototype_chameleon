@@ -24,4 +24,21 @@ database:
   #   SQLite: "sqlite:///chameleon.db"
   #   PostgreSQL: "postgresql://user:password@localhost/dbname"
   #   MySQL: "mysql://user:password@localhost/dbname"
+  #   Teradata: "teradata://user:password@host/database"
   url: "sqlite:///chameleon.db"
+  
+  # Optional database schema prefix (default: None)
+  # Used for enterprise databases where tables must be in a specific schema
+  # Example: "retail_data" or "my_app_schema"
+  # Leave commented out for SQLite (which doesn't support schemas)
+  # schema: "my_app_schema"
+
+# Optional table name mappings (defaults shown below)
+# Customize these if your organization requires different table names
+# Any omitted table will use its default name
+# tables:
+#   code_vault: "codevault"
+#   tool_registry: "toolregistry"
+#   resource_registry: "resourceregistry"
+#   prompt_registry: "promptregistry"
+#   sales_per_day: "sales_per_day"
