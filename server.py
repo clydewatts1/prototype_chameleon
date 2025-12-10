@@ -20,9 +20,9 @@ from mcp.types import (
     GetPromptResult,
     PromptMessage
 )
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from models import get_engine, create_db_and_tables
+from models import get_engine, create_db_and_tables, ToolRegistry
 from runtime import (
     execute_tool, 
     list_tools_for_persona, 
@@ -35,7 +35,11 @@ from runtime import (
     ResourceNotFoundError,
     PromptNotFoundError
 )
+from seed_db import seed_database
 
+
+# Database URL configuration
+DATABASE_URL = "sqlite:///chameleon.db"
 
 # Initialize the server
 app = Server('chameleon-engine')
@@ -56,8 +60,16 @@ async def lifespan(server_instance):
     """Initialize database on server startup."""
     global _db_engine
     # Setup database
-    _db_engine = get_engine("sqlite:///chameleon.db")
+    _db_engine = get_engine(DATABASE_URL)
     create_db_and_tables(_db_engine)
+    
+    # Auto-seed database if empty
+    with Session(_db_engine) as session:
+        existing_tools = session.exec(select(ToolRegistry)).first()
+        if not existing_tools:
+            # Database is empty, seed it with sample data
+            seed_database(database_url=DATABASE_URL, clear_existing=False)
+    
     yield
     # Cleanup can be added here if needed
 
