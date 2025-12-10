@@ -285,14 +285,21 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             session.add(sales_record)
         print(f"   ✅ Added 20 rows to sales_per_day table")
         
-        # Sample Tool using SELECT code_type
-        print("\n[9] Adding 'get_sales_summary' tool with SELECT code_type...")
+        # Sample Tool using SELECT code_type with Jinja2 + SQLAlchemy binding
+        print("\n[9] Adding 'get_sales_summary' tool with SELECT code_type (hybrid approach)...")
         sales_query_code = """SELECT 
     store_name,
     department,
     SUM(sales_amount) as total_sales,
     COUNT(*) as transaction_count
 FROM sales_per_day
+WHERE 1=1
+{% if arguments.store_name %}
+  AND store_name = :store_name
+{% endif %}
+{% if arguments.department %}
+  AND department = :department
+{% endif %}
 GROUP BY store_name, department
 ORDER BY total_sales DESC"""
         sales_query_hash = _compute_hash(sales_query_code)
@@ -307,10 +314,19 @@ ORDER BY total_sales DESC"""
         sales_tool = ToolRegistry(
             tool_name="get_sales_summary",
             target_persona="default",
-            description="Get sales summary grouped by store and department using SQL SELECT",
+            description="Get sales summary grouped by store and department. Supports optional filtering by store_name and/or department using secure SQL parameter binding.",
             input_schema={
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "store_name": {
+                        "type": "string",
+                        "description": "Optional: Filter by store name"
+                    },
+                    "department": {
+                        "type": "string",
+                        "description": "Optional: Filter by department"
+                    }
+                },
                 "required": []
             },
             active_hash_ref=sales_query_hash
@@ -350,6 +366,61 @@ LIMIT 10"""
         session.add(sales_report_resource)
         print(f"   ✅ Resource 'sales_report' added (dynamic, hash: {sales_report_hash[:16]}...)")
         
+        # Sample Tool demonstrating date filtering with Jinja2 + SQLAlchemy
+        print("\n[11] Adding 'get_sales_by_category' tool with date filtering...")
+        sales_by_category_code = """SELECT 
+    department,
+    SUM(sales_amount) as total_sales,
+    AVG(sales_amount) as avg_sales
+FROM sales_per_day
+WHERE 1=1
+{% if arguments.start_date %}
+  AND business_date >= :start_date
+{% endif %}
+{% if arguments.end_date %}
+  AND business_date <= :end_date
+{% endif %}
+{% if arguments.min_amount %}
+  AND sales_amount >= :min_amount
+{% endif %}
+GROUP BY department
+ORDER BY total_sales DESC"""
+        sales_by_category_hash = _compute_hash(sales_by_category_code)
+        
+        sales_by_category_vault = CodeVault(
+            hash=sales_by_category_hash,
+            code_blob=sales_by_category_code,
+            code_type="select"
+        )
+        session.add(sales_by_category_vault)
+        
+        sales_by_category_tool = ToolRegistry(
+            tool_name="get_sales_by_category",
+            target_persona="default",
+            description="Get sales summary by category/department with optional date range and minimum amount filtering. Demonstrates secure dynamic SQL with Jinja2 structure + SQLAlchemy parameter binding.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Optional: Start date (YYYY-MM-DD format)"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Optional: End date (YYYY-MM-DD format)"
+                    },
+                    "min_amount": {
+                        "type": "number",
+                        "description": "Optional: Minimum sales amount filter"
+                    }
+                },
+                "required": []
+            },
+            active_hash_ref=sales_by_category_hash
+        )
+        session.add(sales_by_category_tool)
+        print(f"   ✅ Tool 'get_sales_by_category' added (hash: {sales_by_category_hash[:16]}...)")
+        
         # Commit all changes
         session.commit()
         
@@ -363,7 +434,8 @@ LIMIT 10"""
         print("  - add (persona: default)")
         print("  - multiply (persona: assistant)")
         print("  - uppercase (persona: default)")
-        print("  - get_sales_summary (persona: default, code_type: select)")
+        print("  - get_sales_summary (persona: default, code_type: select, with filtering)")
+        print("  - get_sales_by_category (persona: default, code_type: select, with date filtering)")
         print("\nResources added:")
         print("  - welcome_message (static, URI: memo://welcome)")
         print("  - server_time (dynamic, URI: system://time, code_type: python)")
@@ -372,6 +444,11 @@ LIMIT 10"""
         print("  - review_code")
         print("\nSample Data:")
         print("  - sales_per_day table: 20 rows")
+        print("\n🔒 Security Features:")
+        print("  - Jinja2 templates for SQL structure (optional WHERE clauses)")
+        print("  - SQLAlchemy parameter binding (:param) for all values")
+        print("  - Single statement validation (prevents SQL injection)")
+        print("  - Read-only validation (only SELECT allowed)")
         print("\nYou can now run the MCP server with: python server.py")
 
 

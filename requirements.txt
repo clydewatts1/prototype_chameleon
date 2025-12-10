@@ -11,6 +11,9 @@ streamlit>=1.52.1
 # Configuration dependencies
 pyyaml>=6.0.2
 
+# Template engine for SQL generation
+jinja2>=3.1.2
+
 # Core dependencies - included with Python 3.12
 # asyncio (built-in)
 # hashlib (built-in)
