@@ -82,8 +82,14 @@ def setup_logging(log_level: str = "INFO"):
                 # If we can't delete a file, just log it to stderr
                 print(f"Warning: Could not delete old log file {old_file}: {e}", file=sys.stderr)
     
-    # Parse log level
-    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    # Parse log level (with validation)
+    log_level_upper = log_level.upper()
+    valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+    if log_level_upper not in valid_levels:
+        print(f"Warning: Invalid log level '{log_level}'. Using INFO.", file=sys.stderr)
+        log_level_upper = 'INFO'
+    
+    numeric_level = getattr(logging, log_level_upper)
     
     # Configure root logger
     root_logger = logging.getLogger()
@@ -128,7 +134,8 @@ async def lifespan(server_instance):
     # _database_url should already be set by main() before app.run() is called
     if _database_url is None:
         # Fallback to default if not set
-        _database_url = "sqlite:///chameleon.db"
+        from config import get_default_config
+        _database_url = get_default_config()['database']['url']
     
     # Setup database
     _db_engine = get_engine(_database_url)
@@ -521,7 +528,7 @@ async def main():
             ],
         )
         
-        # Run in background task
+        # Run MCP server as background task
         async def run_mcp_server():
             async with sse.connect_sse() as streams:
                 await app.run(
@@ -530,18 +537,25 @@ async def main():
                     app.create_initialization_options()
                 )
         
-        # Start MCP server as background task
-        import asyncio
-        asyncio.create_task(run_mcp_server())
+        # Start MCP server task and keep reference to prevent garbage collection
+        mcp_task = asyncio.create_task(run_mcp_server())
         
         # Run uvicorn server
         logging.info(f"Starting SSE server on {args.host}:{args.port}")
-        uvicorn.run(
-            starlette_app,
-            host=args.host,
-            port=args.port,
-            log_level=args.log_level.lower()
-        )
+        try:
+            uvicorn.run(
+                starlette_app,
+                host=args.host,
+                port=args.port,
+                log_level=args.log_level.lower()
+            )
+        finally:
+            # Cancel the MCP task when uvicorn stops
+            mcp_task.cancel()
+            try:
+                await mcp_task
+            except asyncio.CancelledError:
+                pass
 
 
 if __name__ == "__main__":

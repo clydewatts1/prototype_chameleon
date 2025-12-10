@@ -5,6 +5,7 @@ Loads configuration from YAML file with sensible defaults.
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Dict, Any
 
@@ -70,10 +71,10 @@ def load_config() -> Dict[str, Any]:
     
     except ImportError:
         # PyYAML not installed, return defaults
-        print("Warning: PyYAML not installed. Using default configuration.")
+        print("Warning: PyYAML not installed. Using default configuration.", file=sys.stderr)
         return config
     
     except Exception as e:
         # Error loading config file, return defaults
-        print(f"Warning: Error loading config file: {e}. Using default configuration.")
+        print(f"Warning: Error loading config file: {e}. Using default configuration.", file=sys.stderr)
         return config
