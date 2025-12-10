@@ -6,6 +6,25 @@ This module defines the database schema for storing code and tool configurations
 
 from sqlmodel import Field, SQLModel, create_engine, Column
 from sqlalchemy import JSON
+from datetime import date
+
+
+class SalesPerDay(SQLModel, table=True):
+    """
+    Table for storing daily sales data.
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        business_date: Date of the sales transaction
+        store_name: Name of the store
+        department: Department name
+        sales_amount: Sales amount in dollars
+    """
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    business_date: date = Field(description="Date of the sales transaction")
+    store_name: str = Field(description="Name of the store")
+    department: str = Field(description="Department name")
+    sales_amount: float = Field(description="Sales amount in dollars")
 
 
 class CodeVault(SQLModel, table=True):

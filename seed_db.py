@@ -5,8 +5,9 @@ This script populates the database with sample tools for testing the MCP server.
 """
 
 import hashlib
+from datetime import date, timedelta
 from sqlmodel import Session, select
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine, create_db_and_tables
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables
 
 
 def _compute_hash(code: str) -> str:
@@ -34,6 +35,7 @@ def _clear_database(session: Session) -> None:
     session.exec(ResourceRegistry.__table__.delete())
     session.exec(PromptRegistry.__table__.delete())
     session.exec(CodeVault.__table__.delete())
+    session.exec(SalesPerDay.__table__.delete())
     session.commit()
 
 
@@ -266,6 +268,88 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         session.add(server_time_resource)
         print(f"   ✅ Resource 'server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
         
+        # Sample Data: sales_per_day table
+        print("\n[8] Populating sales_per_day table with sample data...")
+        stores = ["Store A", "Store B", "Store C", "Store D"]
+        departments = ["Electronics", "Clothing", "Groceries", "Home & Garden", "Sports"]
+        
+        # Create 20 rows of sales data
+        base_date = date(2024, 1, 1)
+        for i in range(20):
+            sales_record = SalesPerDay(
+                business_date=base_date + timedelta(days=i),
+                store_name=stores[i % len(stores)],
+                department=departments[i % len(departments)],
+                sales_amount=round(1000 + (i * 150.75) + ((i % 3) * 500), 2)
+            )
+            session.add(sales_record)
+        print(f"   ✅ Added 20 rows to sales_per_day table")
+        
+        # Sample Tool using SELECT code_type
+        print("\n[9] Adding 'get_sales_summary' tool with SELECT code_type...")
+        sales_query_code = """SELECT 
+    store_name,
+    department,
+    SUM(sales_amount) as total_sales,
+    COUNT(*) as transaction_count
+FROM salesperday
+GROUP BY store_name, department
+ORDER BY total_sales DESC"""
+        sales_query_hash = _compute_hash(sales_query_code)
+        
+        sales_query_vault = CodeVault(
+            hash=sales_query_hash,
+            code_blob=sales_query_code,
+            code_type="select"
+        )
+        session.add(sales_query_vault)
+        
+        sales_tool = ToolRegistry(
+            tool_name="get_sales_summary",
+            target_persona="default",
+            description="Get sales summary grouped by store and department using SQL SELECT",
+            input_schema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            },
+            active_hash_ref=sales_query_hash
+        )
+        session.add(sales_tool)
+        print(f"   ✅ Tool 'get_sales_summary' added (hash: {sales_query_hash[:16]}...)")
+        
+        # Sample Resource using SELECT code_type
+        print("\n[10] Adding 'sales_report' resource with SELECT code_type...")
+        sales_report_code = """SELECT 
+    business_date,
+    store_name,
+    SUM(sales_amount) as daily_total
+FROM salesperday
+GROUP BY business_date, store_name
+ORDER BY business_date DESC
+LIMIT 10"""
+        sales_report_hash = _compute_hash(sales_report_code)
+        
+        sales_report_vault = CodeVault(
+            hash=sales_report_hash,
+            code_blob=sales_report_code,
+            code_type="select"
+        )
+        session.add(sales_report_vault)
+        
+        sales_report_resource = ResourceRegistry(
+            uri_schema="data://sales/recent",
+            name="sales_report",
+            description="Recent sales report showing daily totals by store (last 10 days)",
+            mime_type="text/plain",
+            is_dynamic=True,
+            static_content=None,
+            active_hash_ref=sales_report_hash,
+            target_persona="default"
+        )
+        session.add(sales_report_resource)
+        print(f"   ✅ Resource 'sales_report' added (dynamic, hash: {sales_report_hash[:16]}...)")
+        
         # Commit all changes
         session.commit()
         
@@ -279,11 +363,15 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         print("  - add (persona: default)")
         print("  - multiply (persona: assistant)")
         print("  - uppercase (persona: default)")
+        print("  - get_sales_summary (persona: default, code_type: select)")
         print("\nResources added:")
         print("  - welcome_message (static, URI: memo://welcome)")
-        print("  - server_time (dynamic, URI: system://time)")
+        print("  - server_time (dynamic, URI: system://time, code_type: python)")
+        print("  - sales_report (dynamic, URI: data://sales/recent, code_type: select)")
         print("\nPrompts added:")
         print("  - review_code")
+        print("\nSample Data:")
+        print("  - sales_per_day table: 20 rows")
         print("\nYou can now run the MCP server with: python server.py")
 
 
