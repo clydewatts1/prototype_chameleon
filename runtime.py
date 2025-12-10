@@ -18,10 +18,12 @@ EXECUTION CONTRACT:
 """
 
 import hashlib
+import re
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
 from sqlalchemy import text
 from mcp.types import AnyUrl
+from jinja2 import Template
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
 
@@ -56,6 +58,66 @@ def _compute_hash(code: str) -> str:
         SHA-256 hash as hexadecimal string
     """
     return hashlib.sha256(code.encode('utf-8')).hexdigest()
+
+
+def _validate_single_statement(sql: str) -> None:
+    """
+    Validate that SQL contains only a single statement.
+    
+    Raises SecurityError if multiple statements are detected (e.g., via semicolons
+    that are not at the end of the query).
+    
+    Args:
+        sql: The SQL query string to validate
+        
+    Raises:
+        SecurityError: If multiple statements are detected
+    """
+    # Remove trailing whitespace and semicolons
+    sql_stripped = sql.rstrip().rstrip(';').rstrip()
+    
+    # Check for semicolons in the middle of the query
+    if ';' in sql_stripped:
+        raise SecurityError(
+            "Multiple SQL statements detected. Only single statements are allowed."
+        )
+
+
+def _validate_read_only(sql: str) -> None:
+    """
+    Validate that SQL is a read-only SELECT statement.
+    
+    Raises SecurityError if the query contains write operations like INSERT,
+    UPDATE, DELETE, DROP, or ALTER.
+    
+    Args:
+        sql: The SQL query string to validate
+        
+    Raises:
+        SecurityError: If write operations are detected
+    """
+    # Normalize: strip and convert to uppercase for checking
+    sql_upper = sql.strip().upper()
+    
+    # Check if it starts with SELECT (allowing whitespace/comments)
+    # Remove leading whitespace and SQL comments
+    sql_cleaned = re.sub(r'^\s*(--[^\n]*\n\s*)*', '', sql_upper)
+    
+    if not sql_cleaned.startswith('SELECT'):
+        raise SecurityError(
+            "Only SELECT statements are allowed. Query must start with SELECT."
+        )
+    
+    # Check for dangerous keywords that should not appear in a SELECT
+    dangerous_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 
+                          'TRUNCATE', 'EXEC', 'EXECUTE']
+    
+    for keyword in dangerous_keywords:
+        # Use word boundaries to avoid false positives
+        if re.search(rf'\b{keyword}\b', sql_upper):
+            raise SecurityError(
+                f"Dangerous keyword '{keyword}' detected. Only SELECT statements are allowed."
+            )
 
 
 def execute_tool(
@@ -117,16 +179,23 @@ def execute_tool(
     
     # Execute based on code type
     if code_vault.code_type == 'select':
-        # Execute SQL SELECT statement
-        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
-        # Raw SQL execution without parameterization or validation can be
-        # dangerous if CodeVault contains untrusted code. For production with
-        # untrusted code, consider:
-        # - Query whitelisting or validation
-        # - Read-only database connections for SELECT operations
-        # - Parameterized query templates
-        # - Running queries in isolated database contexts
-        result = db_session.exec(text(code_vault.code_blob)).all()
+        # Step 1: Render SQL template with Jinja2 for structural logic
+        # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
+        # Values must use SQLAlchemy parameter binding with :param_name syntax
+        template = Template(code_vault.code_blob)
+        rendered_sql = template.render(arguments=arguments)
+        
+        # Step 2: Security validation
+        # Validate single statement (no SQL injection via multiple statements)
+        _validate_single_statement(rendered_sql)
+        
+        # Validate read-only (only SELECT statements allowed)
+        _validate_read_only(rendered_sql)
+        
+        # Step 3: Safe execution with SQLAlchemy parameter binding
+        # The rendered SQL should use :param_name syntax for values
+        # Pass arguments dictionary to db_session.exec() as params for safe binding
+        result = db_session.exec(text(rendered_sql), params=arguments).all()
         return result
     else:
         # Default to python execution
@@ -266,16 +335,25 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
     
     # Execute based on code type
     if code_vault.code_type == 'select':
-        # Execute SQL SELECT statement
-        # SECURITY NOTE: This design assumes code in CodeVault is trusted.
-        # Raw SQL execution without parameterization or validation can be
-        # dangerous if CodeVault contains untrusted code. For production with
-        # untrusted code, consider:
-        # - Query whitelisting or validation
-        # - Read-only database connections for SELECT operations
-        # - Parameterized query templates
-        # - Running queries in isolated database contexts
-        result = db_session.exec(text(code_vault.code_blob)).all()
+        # Step 1: Render SQL template with Jinja2 for structural logic
+        # Create arguments dict from available context (uri, persona)
+        template_args = {
+            'uri': uri_str,
+            'persona': persona,
+        }
+        template = Template(code_vault.code_blob)
+        rendered_sql = template.render(arguments=template_args)
+        
+        # Step 2: Security validation
+        # Validate single statement (no SQL injection via multiple statements)
+        _validate_single_statement(rendered_sql)
+        
+        # Validate read-only (only SELECT statements allowed)
+        _validate_read_only(rendered_sql)
+        
+        # Step 3: Safe execution with SQLAlchemy parameter binding
+        # Pass template_args as params for safe binding
+        result = db_session.exec(text(rendered_sql), params=template_args).all()
         return str(result)
     else:
         # Default to python execution
