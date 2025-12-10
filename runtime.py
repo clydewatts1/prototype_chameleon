@@ -99,22 +99,32 @@ def _validate_read_only(sql: str) -> None:
     # Normalize: strip and convert to uppercase for checking
     sql_upper = sql.strip().upper()
     
-    # Check if it starts with SELECT (allowing whitespace/comments)
-    # Remove leading whitespace and SQL comments
-    sql_cleaned = re.sub(r'^\s*(--[^\n]*\n\s*)*', '', sql_upper)
+    # Remove SQL comments (both single-line and multi-line) first
+    sql_cleaned = re.sub(r'--[^\n]*', '', sql_upper)  # Single-line comments
+    sql_cleaned = re.sub(r'/\*.*?\*/', '', sql_cleaned, flags=re.DOTALL)  # Multi-line comments
+    sql_cleaned = sql_cleaned.strip()
     
+    # Check if it starts with SELECT (after comments removed)
     if not sql_cleaned.startswith('SELECT'):
         raise SecurityError(
             "Only SELECT statements are allowed. Query must start with SELECT."
         )
     
     # Check for dangerous keywords that should not appear in a SELECT
-    dangerous_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 
-                          'TRUNCATE', 'EXEC', 'EXECUTE']
+    # Using more comprehensive patterns to catch various forms
+    dangerous_patterns = [
+        (r'\bINSERT\s*(\(|INTO)', 'INSERT'),
+        (r'\bUPDATE\s+\w+\s+SET', 'UPDATE'),
+        (r'\bDELETE\s+(FROM|\s)', 'DELETE'),
+        (r'\bDROP\s+', 'DROP'),
+        (r'\bALTER\s+', 'ALTER'),
+        (r'\bCREATE\s+', 'CREATE'),
+        (r'\bTRUNCATE\s+', 'TRUNCATE'),
+        (r'\bEXEC(UTE)?\s*(\(|\s)', 'EXEC/EXECUTE'),
+    ]
     
-    for keyword in dangerous_keywords:
-        # Use word boundaries to avoid false positives
-        if re.search(rf'\b{keyword}\b', sql_upper):
+    for pattern, keyword in dangerous_patterns:
+        if re.search(pattern, sql_cleaned):
             raise SecurityError(
                 f"Dangerous keyword '{keyword}' detected. Only SELECT statements are allowed."
             )
