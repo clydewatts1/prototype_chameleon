@@ -14,10 +14,12 @@ class CodeVault(SQLModel, table=True):
     
     Attributes:
         hash: SHA-256 hash of the code (Primary Key)
-        python_blob: The executable code as text
+        code_blob: The executable code as text
+        code_type: Type of code ('python' or 'select')
     """
     hash: str = Field(primary_key=True, description="SHA-256 hash of the code")
-    python_blob: str = Field(description="The executable code")
+    code_blob: str = Field(description="The executable code")
+    code_type: str = Field(default="python", description="Type of code: 'python' or 'select'")
 
 
 class ToolRegistry(SQLModel, table=True):

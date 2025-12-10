@@ -71,7 +71,8 @@ result = f'Hello {name}! I am running from the database.'
         print("\n[1] Adding greeting tool...")
         greeting_vault = CodeVault(
             hash=greeting_hash,
-            python_blob=greeting_code
+            code_blob=greeting_code,
+            code_type="python"
         )
         session.add(greeting_vault)
         
@@ -104,7 +105,8 @@ result = a + b
         print("\n[2] Adding calculator (add) tool...")
         add_vault = CodeVault(
             hash=add_hash,
-            python_blob=add_code
+            code_blob=add_code,
+            code_type="python"
         )
         session.add(add_vault)
         
@@ -141,7 +143,8 @@ result = a * b
         print("\n[3] Adding calculator (multiply) tool for assistant persona...")
         multiply_vault = CodeVault(
             hash=multiply_hash,
-            python_blob=multiply_code
+            code_blob=multiply_code,
+            code_type="python"
         )
         session.add(multiply_vault)
         
@@ -177,7 +180,8 @@ result = text.upper()
         print("\n[4] Adding uppercase tool...")
         uppercase_vault = CodeVault(
             hash=uppercase_hash,
-            python_blob=uppercase_code
+            code_blob=uppercase_code,
+            code_type="python"
         )
         session.add(uppercase_vault)
         
@@ -244,7 +248,8 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         
         server_time_vault = CodeVault(
             hash=server_time_hash,
-            python_blob=server_time_code
+            code_blob=server_time_code,
+            code_type="python"
         )
         session.add(server_time_vault)
         
