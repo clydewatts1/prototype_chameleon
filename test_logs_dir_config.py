@@ -170,7 +170,7 @@ server:
             if original_home:
                 os.environ['HOME'] = original_home
             else:
-                del os.environ['HOME']
+                os.environ.pop('HOME', None)
 
 
 if __name__ == "__main__":
