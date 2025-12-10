@@ -6,6 +6,11 @@ based on persona stored in the database.
 """
 
 import asyncio
+import logging
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 from contextlib import asynccontextmanager
 
@@ -48,6 +53,62 @@ app = Server('chameleon-engine')
 _db_engine = None
 
 
+def setup_logging():
+    """
+    Configure logging for the MCP server.
+    
+    Creates a logs/ directory if it doesn't exist, generates a timestamped
+    log file, and enforces a limit of 10 log files by deleting the oldest ones.
+    Configures the root logger to write to both the log file and stderr.
+    """
+    # Create logs directory if it doesn't exist
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Generate timestamped log filename with microsecond precision
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    log_filename = logs_dir / f"mcp_server_{timestamp}.log"
+    
+    # Enforce log file limit (keep only 10 newest)
+    log_files = sorted(logs_dir.glob("mcp_server_*.log"), key=lambda p: p.stat().st_ctime)
+    if len(log_files) >= 10:
+        # Delete oldest files to keep only 9, so with the new one we'll have 10
+        files_to_delete = log_files[:len(log_files) - 9]
+        for old_file in files_to_delete:
+            try:
+                old_file.unlink()
+            except OSError as e:
+                # If we can't delete a file, just log it to stderr
+                print(f"Warning: Could not delete old log file {old_file}: {e}", file=sys.stderr)
+    
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Clear any existing handlers
+    root_logger.handlers.clear()
+    
+    # File handler
+    file_handler = logging.FileHandler(log_filename)
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
+    
+    # Stderr handler
+    stderr_handler = logging.StreamHandler()
+    stderr_handler.setLevel(logging.INFO)
+    stderr_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    stderr_handler.setFormatter(stderr_formatter)
+    root_logger.addHandler(stderr_handler)
+    
+    logging.info(f"Logging initialized. Log file: {log_filename}")
+
+
 def get_db_engine():
     """Get the database engine instance."""
     if _db_engine is None:
@@ -59,19 +120,28 @@ def get_db_engine():
 async def lifespan(server_instance):
     """Initialize database on server startup."""
     global _db_engine
+    
+    # Setup logging
+    setup_logging()
+    logging.info("Server starting up...")
+    
     # Setup database
     _db_engine = get_engine(DATABASE_URL)
     create_db_and_tables(_db_engine)
+    logging.info(f"Database initialized at {DATABASE_URL}")
     
     # Auto-seed database if empty
     with Session(_db_engine) as session:
         existing_tools = session.exec(select(ToolRegistry)).first()
         if not existing_tools:
             # Database is empty, seed it with sample data
+            logging.info("Database is empty, seeding with sample data...")
             seed_database(database_url=DATABASE_URL, clear_existing=False)
+            logging.info("Database seeding completed")
     
     yield
     # Cleanup can be added here if needed
+    logging.info("Server shutting down...")
 
 
 # Set up lifespan
@@ -115,6 +185,7 @@ async def handle_list_tools() -> list[Tool]:
         List of Tool objects available for the current persona
     """
     persona = _get_persona_from_context()
+    logging.info(f"Listing tools for persona: {persona}")
     
     # Get tools from database for this persona
     engine = get_db_engine()
@@ -131,6 +202,7 @@ async def handle_list_tools() -> list[Tool]:
         )
         tools.append(tool)
     
+    logging.info(f"Returning {len(tools)} tool(s) for persona: {persona}")
     return tools
 
 
@@ -150,6 +222,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         Exception: If tool execution fails
     """
     persona = _get_persona_from_context()
+    logging.info(f"Calling tool '{name}' for persona '{persona}' with arguments: {arguments}")
     
     try:
         # Execute the tool
@@ -163,21 +236,25 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         else:
             result_text = str(result)
         
+        logging.info(f"Tool '{name}' executed successfully")
         # Wrap in TextContent and return
         return [TextContent(type="text", text=result_text)]
     
     except ToolNotFoundError as e:
         # Tool not found - return helpful error message
+        logging.error(f"Tool not found: {str(e)}")
         error_text = f"Error: {str(e)}"
         return [TextContent(type="text", text=error_text)]
     
     except SecurityError as e:
         # Security validation failed - return error
+        logging.error(f"Security error executing tool '{name}': {str(e)}")
         error_text = f"Security Error: {str(e)}"
         return [TextContent(type="text", text=error_text)]
     
     except Exception as e:
         # Unexpected error - return generic error message
+        logging.error(f"Unexpected error executing tool '{name}': {str(e)}", exc_info=True)
         error_text = f"Unexpected error executing tool '{name}': {str(e)}"
         return [TextContent(type="text", text=error_text)]
 
@@ -191,6 +268,7 @@ async def handle_list_resources() -> list[Resource]:
         List of Resource objects available
     """
     persona = _get_persona_from_context()
+    logging.info(f"Listing resources for persona: {persona}")
     
     # Get resources from database
     engine = get_db_engine()
@@ -208,6 +286,7 @@ async def handle_list_resources() -> list[Resource]:
         )
         resources.append(resource)
     
+    logging.info(f"Returning {len(resources)} resource(s) for persona: {persona}")
     return resources
 
 
@@ -226,6 +305,7 @@ async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
         Exception: If resource reading fails
     """
     persona = _get_persona_from_context()
+    logging.info(f"Reading resource '{uri}' for persona '{persona}'")
     
     try:
         # Get the resource content
@@ -233,6 +313,7 @@ async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
         with Session(engine) as session:
             content = get_resource(uri, persona, session)
         
+        logging.info(f"Resource '{uri}' read successfully")
         # Return as list of ReadResourceContents
         return [
             ReadResourceContents(
@@ -243,14 +324,17 @@ async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
     
     except ResourceNotFoundError as e:
         # Resource not found - raise exception
+        logging.error(f"Resource not found: {str(e)}")
         raise ValueError(f"Error: {str(e)}")
     
     except SecurityError as e:
         # Security validation failed
+        logging.error(f"Security error reading resource '{uri}': {str(e)}")
         raise ValueError(f"Security Error: {str(e)}")
     
     except Exception as e:
         # Unexpected error
+        logging.error(f"Unexpected error reading resource '{uri}': {str(e)}", exc_info=True)
         raise ValueError(f"Unexpected error reading resource '{uri}': {str(e)}")
 
 
