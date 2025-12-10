@@ -22,7 +22,8 @@ def get_default_config() -> Dict[str, Any]:
             'transport': 'stdio',
             'host': '0.0.0.0',
             'port': 8000,
-            'log_level': 'INFO'
+            'log_level': 'INFO',
+            'logs_dir': 'logs'
         },
         'database': {
             'url': 'sqlite:///chameleon.db'

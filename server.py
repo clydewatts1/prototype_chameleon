@@ -54,24 +54,28 @@ _db_engine = None
 _database_url = None
 
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(log_level: str = "INFO", logs_dir: str = "logs"):
     """
     Configure logging for the MCP server.
     
-    Creates a logs/ directory if it doesn't exist, generates a timestamped
+    Creates a logs directory if it doesn't exist, generates a timestamped
     log file, and enforces a limit of 10 log files by deleting the oldest ones.
     Configures the root logger to write to both the log file and stderr.
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        logs_dir: Directory path for log files (default: "logs")
     """
     # Create logs directory if it doesn't exist
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
+    logs_path = Path(logs_dir)
+    logs_path.mkdir(parents=True, exist_ok=True)
     
     # Generate timestamped log filename with microsecond precision
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    log_filename = logs_dir / f"mcp_server_{timestamp}.log"
+    log_filename = logs_path / f"mcp_server_{timestamp}.log"
     
     # Enforce log file limit (keep only 10 newest)
-    log_files = sorted(logs_dir.glob("mcp_server_*.log"), key=lambda p: p.stat().st_ctime)
+    log_files = sorted(logs_path.glob("mcp_server_*.log"), key=lambda p: p.stat().st_ctime)
     if len(log_files) >= 10:
         # Delete oldest files to keep only 9, so with the new one we'll have 10
         files_to_delete = log_files[:len(log_files) - 9]
@@ -477,6 +481,11 @@ async def main():
         help='Logging level (default: from config or INFO)'
     )
     parser.add_argument(
+        '--logs-dir',
+        default=config['server']['logs_dir'],
+        help='Directory path for log files (default: from config or logs)'
+    )
+    parser.add_argument(
         '--database-url',
         default=config['database']['url'],
         help='Database URL (default: from config or sqlite:///chameleon.db)'
@@ -484,11 +493,12 @@ async def main():
     
     args = parser.parse_args()
     
-    # Setup logging with configured level
-    setup_logging(args.log_level)
+    # Setup logging with configured level and directory
+    setup_logging(args.log_level, args.logs_dir)
     logging.info("Server starting up...")
     logging.info(f"Transport: {args.transport}")
     logging.info(f"Database URL: {args.database_url}")
+    logging.info(f"Logs directory: {args.logs_dir}")
     
     # Set database URL for lifespan handler
     _database_url = args.database_url
