@@ -292,7 +292,7 @@ result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     department,
     SUM(sales_amount) as total_sales,
     COUNT(*) as transaction_count
-FROM salesperday
+FROM sales_per_day
 GROUP BY store_name, department
 ORDER BY total_sales DESC"""
         sales_query_hash = _compute_hash(sales_query_code)
@@ -324,7 +324,7 @@ ORDER BY total_sales DESC"""
     business_date,
     store_name,
     SUM(sales_amount) as daily_total
-FROM salesperday
+FROM sales_per_day
 GROUP BY business_date, store_name
 ORDER BY business_date DESC
 LIMIT 10"""

@@ -20,6 +20,8 @@ class SalesPerDay(SQLModel, table=True):
         department: Department name
         sales_amount: Sales amount in dollars
     """
+    __tablename__ = "sales_per_day"
+    
     id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
     business_date: date = Field(description="Date of the sales transaction")
     store_name: str = Field(description="Name of the store")
