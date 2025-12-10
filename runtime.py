@@ -20,6 +20,7 @@ EXECUTION CONTRACT:
 import hashlib
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
+from sqlalchemy import text
 from mcp.types import AnyUrl
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
 
@@ -125,7 +126,6 @@ def execute_tool(
         # - Read-only database connections for SELECT operations
         # - Parameterized query templates
         # - Running queries in isolated database contexts
-        from sqlalchemy import text
         result = db_session.exec(text(code_vault.code_blob)).all()
         return result
     else:
@@ -275,7 +275,6 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
         # - Read-only database connections for SELECT operations
         # - Parameterized query templates
         # - Running queries in isolated database contexts
-        from sqlalchemy import text
         result = db_session.exec(text(code_vault.code_blob)).all()
         return str(result)
     else:
