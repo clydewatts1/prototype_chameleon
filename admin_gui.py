@@ -11,18 +11,31 @@ import json
 import streamlit as st
 from sqlalchemy import func
 from sqlmodel import Session, select, create_engine
+from config import load_config
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine
 
 
 # Database connection setup
 def get_db_engine():
     """
-    Get database engine using environment variable or default.
+    Get database engine using config or environment variable.
+    
+    Priority:
+    1. CHAMELEON_DB_URL environment variable (for backward compatibility)
+    2. Configuration from ~/.chameleon/config/config.yaml
+    3. Default: sqlite:///chameleon.db
     
     Returns:
         SQLModel engine instance
     """
-    db_url = os.environ.get('CHAMELEON_DB_URL', 'sqlite:///chameleon.db')
+    # Check environment variable first (backward compatibility)
+    db_url = os.environ.get('CHAMELEON_DB_URL')
+    
+    # If not set, load from config
+    if not db_url:
+        config = load_config()
+        db_url = config['database']['url']
+    
     return get_engine(db_url)
 
 
@@ -638,7 +651,11 @@ def main():
         
         st.divider()
         st.caption("Database Connection")
-        db_url = os.environ.get('CHAMELEON_DB_URL', 'sqlite:///chameleon.db')
+        # Get DB URL same way as get_db_engine()
+        db_url = os.environ.get('CHAMELEON_DB_URL')
+        if not db_url:
+            config = load_config()
+            db_url = config['database']['url']
         st.caption(f"📁 {db_url}")
     
     # Route to appropriate page
