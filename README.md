@@ -6,35 +6,52 @@ A dynamic Model Context Protocol (MCP) server that allows execution of tools, re
 
 Chameleon is an innovative MCP server implementation that stores executable code in a database and dynamically serves tools, resources, and prompts based on personas. It provides:
 
+- **Class-Based Plugin Architecture**: Tools inherit from `ChameleonTool` base class for safety and standardization
 - **Dynamic Tool Registry**: Tools are stored in a database and can be added/modified without server code changes
+- **YAML Configuration**: Define tools, resources, and prompts in human-readable YAML format
 - **Resource Management**: Support for both static and dynamic resources with code execution
 - **Prompt Templates**: Store and format prompt templates with argument substitution
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
 - **Code Integrity**: SHA-256 hashing ensures code hasn't been tampered with
-- **Flexible Execution**: Tools and dynamic resources are defined as Python code snippets stored in the database
+- **Enhanced Security**: AST-based code validation prevents arbitrary top-level code execution
 
 ## Architecture
 
-The project consists of four main components:
+The project consists of the following main components:
 
-1. **models.py**: Database schema using SQLModel
+1. **base.py**: Abstract base class for plugins
+   - `ChameleonTool`: Abstract base class that all Python tools must inherit from
+   - Provides `run(arguments)` abstract method
+   - Provides `log(msg)` helper for standardized output
+   - Enforces strict inheritance model for safety
+
+2. **models.py**: Database schema using SQLModel
    - `CodeVault`: Stores executable code with SHA-256 hash as primary key
    - `ToolRegistry`: Maps tools to personas with JSON schema definitions
    - `ResourceRegistry`: Defines resources with static or dynamic content
    - `PromptRegistry`: Stores prompt templates with argument schemas
 
-2. **runtime.py**: Secure code execution engine
+3. **runtime.py**: Secure code execution engine
+   - AST-based code validation (only allows imports and class definitions at top level)
    - Validates code integrity via hash checking
-   - Executes stored code in controlled environment
+   - Finds and instantiates classes inheriting from `ChameleonTool`
    - Provides tool, resource, and prompt listing and execution functions
+   - Supports both Python (class-based) and SQL execution
 
-3. **server.py**: MCP server implementation
+4. **server.py**: MCP server implementation
    - Implements MCP protocol using low-level Server class
    - Handles tool, resource, and prompt listing and execution requests
    - Manages database lifecycle
 
-4. **seed_db.py**: Database seeding utility
-   - Populates database with sample tools, resources, and prompts for testing
+5. **load_specs.py**: YAML-based configuration loader
+   - Loads tool, resource, and prompt definitions from YAML files
+   - Idempotent upsert operations (safe to run multiple times)
+   - Computes hashes and syncs to database
+   - Supports `--clean` flag for resetting database
+
+6. **seed_db.py**: Legacy Python-based seeding utility (deprecated)
+   - Populates database with hardcoded sample tools, resources, and prompts
+   - Retained for backward compatibility
 
 ## Installation
 
@@ -168,15 +185,79 @@ The server will:
 **Prompts:**
 - `review_code` - Template for generating code review requests
 
-### 3. Manually Seed the Database (Optional)
+### 3. Seed the Database
 
-If you want to reset the database or manually populate it with fresh sample data:
+Chameleon provides two ways to populate your database with tools, resources, and prompts:
+
+#### Option A: YAML-Based Seeding (Recommended)
+
+The flexible YAML-based system allows you to define your specifications in a human-readable format:
+
+```bash
+# Load specifications from YAML (idempotent - safe to run multiple times)
+python load_specs.py specs.yaml
+
+# With custom database
+python load_specs.py specs.yaml --database sqlite:///mydb.db
+
+# Clear existing data before loading
+python load_specs.py specs.yaml --clean
+```
+
+The YAML file format (`specs.yaml`):
+
+```yaml
+tools:
+  - name: greet
+    persona: default
+    description: Greets a person by name
+    code_type: python
+    code: |
+      from base import ChameleonTool
+      
+      class GreetingTool(ChameleonTool):
+          def run(self, arguments):
+              name = arguments.get('name', 'Guest')
+              return f'Hello {name}!'
+    input_schema:
+      type: object
+      properties:
+        name:
+          type: string
+      required: [name]
+
+resources:
+  - uri: memo://welcome
+    name: welcome_message
+    persona: default
+    is_dynamic: false
+    static_content: "Welcome message here"
+
+prompts:
+  - name: review_code
+    description: Code review prompt
+    template: "Review this code: {code}"
+    arguments_schema:
+      arguments:
+        - name: code
+          required: true
+```
+
+**Benefits:**
+- **Idempotent**: Safe to run multiple times - updates existing entries
+- **Version Control**: Store specifications in Git
+- **Flexible**: Easy to add, modify, or remove tools
+- **Type Support**: Both Python (class-based) and SQL tools
+
+#### Option B: Python Script Seeding
+
+For backward compatibility, you can use the original Python script:
 
 ```bash
 python seed_db.py
 ```
 
-This will clear existing data and repopulate the database with sample tools, resources, and prompts.
+This will clear existing data and repopulate the database with hardcoded sample tools, resources, and prompts.
 
 ### 4. Run the Admin GUI (Optional)
 
@@ -222,6 +303,94 @@ The server implements the MCP protocol and supports:
 - **Get Prompt**: Retrieves and formats a prompt with arguments
 
 Example tool schemas are defined in the database with JSON Schema for validation.
+
+## Creating Custom Tools
+
+Chameleon supports two types of tools: **Python class-based tools** and **SQL-based tools**.
+
+### Python Class-Based Tools
+
+All Python tools must inherit from the `ChameleonTool` base class:
+
+```python
+from base import ChameleonTool
+
+class MyCustomTool(ChameleonTool):
+    def run(self, arguments):
+        # Access arguments
+        name = arguments.get('name', 'default')
+        
+        # Access database session
+        # result = self.db_session.exec(statement).all()
+        
+        # Access context (persona, tool_name, etc.)
+        persona = self.context.get('persona')
+        
+        # Use logging
+        self.log(f"Processing request for {name}")
+        
+        # Return result
+        return f"Processed: {name}"
+```
+
+**Security Features:**
+- Only top-level imports and class definitions are allowed
+- No arbitrary code execution at module level
+- AST-based validation ensures safety
+
+### SQL-Based Tools
+
+SQL tools use Jinja2 templates for structure and SQLAlchemy parameter binding for values:
+
+```sql
+SELECT 
+    column1,
+    column2,
+    SUM(amount) as total
+FROM my_table
+WHERE 1=1
+{% if arguments.filter_value %}
+  AND column1 = :filter_value
+{% endif %}
+GROUP BY column1, column2
+ORDER BY total DESC
+```
+
+**Security Features:**
+- Only SELECT statements allowed (read-only)
+- Single statement validation (prevents SQL injection)
+- Parameter binding for all values
+
+### Adding Tools via YAML
+
+Edit `specs.yaml` and run the loader:
+
+```yaml
+tools:
+  - name: my_tool
+    persona: default
+    description: My custom tool
+    code_type: python  # or 'select' for SQL
+    code: |
+      from base import ChameleonTool
+      
+      class MyTool(ChameleonTool):
+          def run(self, arguments):
+              return "Hello World"
+    input_schema:
+      type: object
+      properties:
+        param1:
+          type: string
+          description: First parameter
+      required: [param1]
+```
+
+Then load it:
+
+```bash
+python load_specs.py specs.yaml
+```
 
 ## Connecting AI Clients
 
