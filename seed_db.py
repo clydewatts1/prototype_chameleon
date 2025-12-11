@@ -65,8 +65,13 @@ def seed_database(database_url: str = "sqlite:///chameleon.db", clear_existing: 
                 print("✅ Database cleared")
         
         # Sample Tool 1: Greeting function
-        greeting_code = """name = arguments.get('name', 'Guest')
-result = f'Hello {name}! I am running from the database.'
+        greeting_code = """from base import ChameleonTool
+
+class GreetingTool(ChameleonTool):
+    def run(self, arguments):
+        name = arguments.get('name', 'Guest')
+        self.log(f"Greeting {name}")
+        return f'Hello {name}! I am running from the database.'
 """
         greeting_hash = _compute_hash(greeting_code)
         
@@ -98,9 +103,14 @@ result = f'Hello {name}! I am running from the database.'
         print(f"   ✅ Tool 'greet' added (hash: {greeting_hash[:16]}...)")
         
         # Sample Tool 2: Calculator - Add
-        add_code = """a = arguments.get('a', 0)
-b = arguments.get('b', 0)
-result = a + b
+        add_code = """from base import ChameleonTool
+
+class AddTool(ChameleonTool):
+    def run(self, arguments):
+        a = arguments.get('a', 0)
+        b = arguments.get('b', 0)
+        self.log(f"Adding {a} + {b}")
+        return a + b
 """
         add_hash = _compute_hash(add_code)
         
@@ -136,9 +146,14 @@ result = a + b
         print(f"   ✅ Tool 'add' added (hash: {add_hash[:16]}...)")
         
         # Sample Tool 3: Calculator - Multiply (for assistant persona)
-        multiply_code = """a = arguments.get('a', 1)
-b = arguments.get('b', 1)
-result = a * b
+        multiply_code = """from base import ChameleonTool
+
+class MultiplyTool(ChameleonTool):
+    def run(self, arguments):
+        a = arguments.get('a', 1)
+        b = arguments.get('b', 1)
+        self.log(f"Multiplying {a} * {b}")
+        return a * b
 """
         multiply_hash = _compute_hash(multiply_code)
         
@@ -174,8 +189,13 @@ result = a * b
         print(f"   ✅ Tool 'multiply' added (hash: {multiply_hash[:16]}...)")
         
         # Sample Tool 4: String manipulation - Uppercase
-        uppercase_code = """text = arguments.get('text', '')
-result = text.upper()
+        uppercase_code = """from base import ChameleonTool
+
+class UppercaseTool(ChameleonTool):
+    def run(self, arguments):
+        text = arguments.get('text', '')
+        self.log(f"Converting to uppercase: {text}")
+        return text.upper()
 """
         uppercase_hash = _compute_hash(uppercase_code)
         
@@ -243,8 +263,13 @@ result = text.upper()
         
         # Sample Resource 2: Dynamic resource that generates current timestamp
         print("\n[7] Adding dynamic resource 'server_time'...")
-        server_time_code = """from datetime import datetime
-result = f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        server_time_code = """from base import ChameleonTool
+from datetime import datetime
+
+class ServerTimeTool(ChameleonTool):
+    def run(self, arguments):
+        self.log("Getting current server time")
+        return f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 """
         server_time_hash = _compute_hash(server_time_code)
         

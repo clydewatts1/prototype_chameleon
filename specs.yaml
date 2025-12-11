@@ -1,0 +1,133 @@
+# Chameleon MCP Server Specifications
+# This file defines tools, resources, and prompts that will be loaded into the database
+
+tools:
+  # Python class-based tool example
+  - name: greet
+    persona: default
+    description: Greets a person by name using class-based architecture
+    code_type: python
+    code: |
+      from base import ChameleonTool
+      
+      class GreetingTool(ChameleonTool):
+          def run(self, arguments):
+              name = arguments.get('name', 'Guest')
+              self.log(f"Greeting {name}")
+              return f'Hello {name}! Welcome to Chameleon MCP Server.'
+    input_schema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the person to greet
+      required:
+        - name
+
+  # Another Python tool - calculator
+  - name: add
+    persona: default
+    description: Add two numbers together
+    code_type: python
+    code: |
+      from base import ChameleonTool
+      
+      class AddTool(ChameleonTool):
+          def run(self, arguments):
+              a = arguments.get('a', 0)
+              b = arguments.get('b', 0)
+              self.log(f"Adding {a} + {b}")
+              return a + b
+    input_schema:
+      type: object
+      properties:
+        a:
+          type: number
+          description: First number
+        b:
+          type: number
+          description: Second number
+      required:
+        - a
+        - b
+
+  # SQL-based tool example
+  - name: list_all_tools
+    persona: default
+    description: Lists all available tools in the registry using SQL
+    code_type: select
+    code: |
+      SELECT 
+          tool_name,
+          target_persona,
+          description
+      FROM toolregistry
+      ORDER BY tool_name
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+
+resources:
+  # Static resource example
+  - uri: memo://welcome
+    name: welcome_message
+    persona: default
+    description: A static welcome message for the Chameleon MCP server
+    mime_type: text/plain
+    is_dynamic: false
+    static_content: |
+      Welcome to Chameleon MCP Server!
+      
+      This is a dynamic MCP server that stores tools, resources, and prompts
+      in a database with persona-based filtering.
+      
+      Features:
+      - Class-based plugin architecture
+      - SQL and Python code execution
+      - Secure code validation
+      - Dynamic resource generation
+
+  # Dynamic resource example
+  - uri: system://time
+    name: server_time
+    persona: default
+    description: Returns the current server time dynamically
+    mime_type: text/plain
+    is_dynamic: true
+    code_type: python
+    code: |
+      from base import ChameleonTool
+      from datetime import datetime
+      
+      class ServerTimeTool(ChameleonTool):
+          def run(self, arguments):
+              self.log("Getting current server time")
+              current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+              return f"Current server time: {current_time}"
+
+prompts:
+  # Prompt example
+  - name: review_code
+    persona: default
+    description: Generates a code review request prompt
+    template: |
+      Please review the following code:
+      
+      ```{language}
+      {code}
+      ```
+      
+      Focus on:
+      - Code quality and readability
+      - Potential bugs or security issues
+      - Performance considerations
+      - Best practices
+    arguments_schema:
+      arguments:
+        - name: code
+          description: The code to review
+          required: true
+        - name: language
+          description: Programming language of the code
+          required: true
