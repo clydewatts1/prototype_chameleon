@@ -446,6 +446,74 @@ ORDER BY total_sales DESC"""
         session.add(sales_by_category_tool)
         print(f"   ✅ Tool 'get_sales_by_category' added (hash: {sales_by_category_hash[:16]}...)")
         
+        # Sample Tool: get_last_error debugging tool
+        print("\n[12] Adding 'get_last_error' debugging tool...")
+        get_last_error_code = """from base import ChameleonTool
+from sqlmodel import select
+from models import ExecutionLog
+
+class GetLastErrorTool(ChameleonTool):
+    def run(self, arguments):
+        tool_name = arguments.get('tool_name')
+        
+        # Build query for last error
+        query = select(ExecutionLog).where(ExecutionLog.status == 'FAILURE')
+        
+        # Optional filter by tool_name
+        if tool_name:
+            query = query.where(ExecutionLog.tool_name == tool_name)
+        
+        # Order by timestamp descending and get the most recent
+        query = query.order_by(ExecutionLog.timestamp.desc()).limit(1)
+        
+        # Execute query
+        result = self.db_session.exec(query).first()
+        
+        if not result:
+            if tool_name:
+                return f"No errors found for tool '{tool_name}'"
+            else:
+                return "No errors found in execution log"
+        
+        # Format the result
+        output = []
+        output.append(f"Last error for tool '{result.tool_name}':")
+        output.append(f"Time: {result.timestamp}")
+        output.append(f"Persona: {result.persona}")
+        output.append(f"Input: {result.arguments}")
+        output.append(f"\\nTraceback:")
+        output.append(result.error_traceback or "No traceback available")
+        
+        return "\\n".join(output)
+"""
+        get_last_error_hash = _compute_hash(get_last_error_code)
+        
+        get_last_error_vault = CodeVault(
+            hash=get_last_error_hash,
+            code_blob=get_last_error_code,
+            code_type="python"
+        )
+        session.add(get_last_error_vault)
+        
+        get_last_error_tool = ToolRegistry(
+            tool_name="get_last_error",
+            target_persona="default",
+            description="Get the last error from the execution log. Returns detailed error information including full Python traceback for AI self-debugging. Optionally filter by tool_name.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "tool_name": {
+                        "type": "string",
+                        "description": "Optional: Filter errors by specific tool name"
+                    }
+                },
+                "required": []
+            },
+            active_hash_ref=get_last_error_hash
+        )
+        session.add(get_last_error_tool)
+        print(f"   ✅ Tool 'get_last_error' added (hash: {get_last_error_hash[:16]}...)")
+        
         # Commit all changes
         session.commit()
         
@@ -461,6 +529,7 @@ ORDER BY total_sales DESC"""
         print("  - uppercase (persona: default)")
         print("  - get_sales_summary (persona: default, code_type: select, with filtering)")
         print("  - get_sales_by_category (persona: default, code_type: select, with date filtering)")
+        print("  - get_last_error (persona: default, debugging tool for AI self-healing)")
         print("\nResources added:")
         print("  - welcome_message (static, URI: memo://welcome)")
         print("  - server_time (dynamic, URI: system://time, code_type: python)")
@@ -474,6 +543,11 @@ ORDER BY total_sales DESC"""
         print("  - SQLAlchemy parameter binding (:param) for all values")
         print("  - Single statement validation (prevents SQL injection)")
         print("  - Read-only validation (only SELECT allowed)")
+        print("\n🔧 AI Self-Debugging Features:")
+        print("  - ExecutionLog table captures all tool executions")
+        print("  - Full Python tracebacks logged for failures")
+        print("  - get_last_error tool provides detailed error diagnostics")
+        print("  - Enables AI self-healing workflow")
         print("\nYou can now run the MCP server with: python server.py")
 
 
