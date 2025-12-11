@@ -34,7 +34,8 @@ def get_default_config() -> Dict[str, Any]:
             'tool_registry': 'toolregistry',
             'resource_registry': 'resourceregistry',
             'prompt_registry': 'promptregistry',
-            'sales_per_day': 'sales_per_day'
+            'sales_per_day': 'sales_per_day',
+            'execution_log': 'executionlog'
         }
     }
 

@@ -5,8 +5,8 @@ This module defines the database schema for storing code and tool configurations
 """
 
 from sqlmodel import Field, SQLModel, create_engine, Column
-from sqlalchemy import JSON
-from datetime import date
+from sqlalchemy import JSON, Text
+from datetime import date, datetime
 from config import load_config
 
 # Load configuration at module level
@@ -140,6 +140,39 @@ class PromptRegistry(SQLModel, table=True):
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the prompt")
+
+
+class ExecutionLog(SQLModel, table=True):
+    """
+    Table for logging tool execution for debugging and self-healing.
+    
+    This is the "Black Box" Recorder pattern that allows AI agents to:
+    1. Run tools and capture full execution details
+    2. Query for detailed error information when a tool fails
+    3. Analyze exact line numbers and error types
+    4. Patch tool code based on precise error information
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        timestamp: When the execution occurred (UTC)
+        tool_name: Name of the tool that was executed
+        persona: The persona context for the execution
+        arguments: The input arguments passed to the tool (JSON)
+        status: Execution status ("SUCCESS" or "FAILURE")
+        result_summary: The output/result (truncated to ~2000 chars)
+        error_traceback: Full Python traceback for failures (Text)
+    """
+    __tablename__ = _table_config.get('execution_log', 'executionlog')
+    __table_args__ = _schema_arg
+    
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of execution (UTC)")
+    tool_name: str = Field(description="Name of the tool executed")
+    persona: str = Field(description="Persona context")
+    arguments: dict = Field(sa_column=Column(JSON), description="Input arguments (JSON)")
+    status: str = Field(description="Execution status: 'SUCCESS' or 'FAILURE'")
+    result_summary: str = Field(description="Output/result (truncated to ~2000 chars)")
+    error_traceback: str | None = Field(sa_column=Column(Text), default=None, description="Full Python traceback for failures")
 
 
 # Database engine setup
