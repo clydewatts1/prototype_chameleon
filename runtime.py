@@ -17,7 +17,9 @@ EXECUTION CONTRACT:
 - If no 'result' variable is set, the function returns None
 """
 
+import ast
 import hashlib
+import inspect
 import re
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
@@ -25,6 +27,7 @@ from sqlalchemy import text
 from mcp.types import AnyUrl
 from jinja2 import Template
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
+from base import ChameleonTool
 
 
 class SecurityError(Exception):
@@ -130,6 +133,35 @@ def _validate_read_only(sql: str) -> None:
             )
 
 
+def validate_code_structure(code_str: str) -> None:
+    """
+    Validate that Python code only contains safe top-level nodes.
+    
+    For class-based plugin architecture, only Import, ImportFrom, and ClassDef
+    nodes are allowed at the top level. This prevents arbitrary code execution
+    at module load time.
+    
+    Args:
+        code_str: The Python code string to validate
+        
+    Raises:
+        SecurityError: If the code contains disallowed top-level nodes
+    """
+    try:
+        tree = ast.parse(code_str)
+    except SyntaxError as e:
+        raise SecurityError(f"Code contains syntax errors: {e}")
+    
+    # Check all top-level nodes
+    for node in tree.body:
+        if not isinstance(node, (ast.Import, ast.ImportFrom, ast.ClassDef)):
+            node_type = type(node).__name__
+            raise SecurityError(
+                f"Invalid top-level node '{node_type}'. Only Import, ImportFrom, "
+                f"and ClassDef are allowed at the top level."
+            )
+
+
 def execute_tool(
     tool_name: str,
     persona: str,
@@ -208,25 +240,38 @@ def execute_tool(
         result = db_session.exec(text(rendered_sql), params=arguments).all()
         return result
     else:
-        # Default to python execution
-        # Sandbox: Execute the code
-        # Create a local scope with arguments and db_session
-        # NOTE: As per requirements, exec() is used for execution and db_session
-        # is passed directly. For production with untrusted code, consider:
-        # - Using RestrictedPython or similar sandboxing
-        # - Implementing a restricted database interface layer
-        # - Running code in isolated containers/processes
-        local_scope = {
-            'arguments': arguments,
-            'db_session': db_session,
+        # Default to python execution with class-based plugin architecture
+        # Step 1: Validate code structure
+        validate_code_structure(code_vault.code_blob)
+        
+        # Step 2: Execute the code to load the class definition
+        # Create a namespace with base class available
+        namespace = {'ChameleonTool': ChameleonTool}
+        exec(code_vault.code_blob, namespace)
+        
+        # Step 3: Find the class that inherits from ChameleonTool
+        tool_class = None
+        for name, obj in namespace.items():
+            if (inspect.isclass(obj) and 
+                issubclass(obj, ChameleonTool) and 
+                obj is not ChameleonTool):
+                tool_class = obj
+                break
+        
+        if tool_class is None:
+            raise SecurityError(
+                "No class inheriting from ChameleonTool found in the code"
+            )
+        
+        # Step 4: Instantiate the tool with db_session and context
+        context = {
+            'persona': persona,
+            'tool_name': tool_name,
         }
+        tool_instance = tool_class(db_session, context)
         
-        # Execute the code in the local scope
-        # The code should set a 'result' variable to return a value
-        exec(code_vault.code_blob, {}, local_scope)
-        
-        # Return the result if the code defines a 'result' variable
-        return local_scope.get('result')
+        # Step 5: Execute the tool's run method
+        return tool_instance.run(arguments)
 
 
 def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
@@ -366,18 +411,39 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
         result = db_session.exec(text(rendered_sql), params=template_args).all()
         return str(result)
     else:
-        # Default to python execution
-        # Execute the code with uri as a parameter
-        local_scope = {
-            'uri': uri_str,
+        # Default to python execution with class-based plugin architecture
+        # Step 1: Validate code structure
+        validate_code_structure(code_vault.code_blob)
+        
+        # Step 2: Execute the code to load the class definition
+        # Create a namespace with base class available
+        namespace = {'ChameleonTool': ChameleonTool}
+        exec(code_vault.code_blob, namespace)
+        
+        # Step 3: Find the class that inherits from ChameleonTool
+        tool_class = None
+        for name, obj in namespace.items():
+            if (inspect.isclass(obj) and 
+                issubclass(obj, ChameleonTool) and 
+                obj is not ChameleonTool):
+                tool_class = obj
+                break
+        
+        if tool_class is None:
+            raise SecurityError(
+                "No class inheriting from ChameleonTool found in the code"
+            )
+        
+        # Step 4: Instantiate the tool with db_session and context
+        context = {
             'persona': persona,
-            'db_session': db_session,
+            'uri': uri_str,
         }
+        tool_instance = tool_class(db_session, context)
         
-        exec(code_vault.code_blob, {}, local_scope)
-        
-        # Return the result
-        result = local_scope.get('result', '')
+        # Step 5: Execute the tool's run method with uri as argument
+        # For resources, pass uri in the arguments dict
+        result = tool_instance.run({'uri': uri_str, 'persona': persona})
         return str(result)
 
 
