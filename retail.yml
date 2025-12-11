@@ -1,0 +1,219 @@
+# Retail MCP Server Tools
+# This file defines tools for querying items and locations/stores
+
+tools:
+  # Get all items
+  - name: get_all_items
+    persona: default
+    description: Retrieve all items from the retail inventory
+    code_type: select
+    code: |
+      SELECT 
+          item_id,
+          item_name,
+          item_department,
+          item_section,
+          item_size,
+          item_colour
+      FROM item_table
+      ORDER BY item_id
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+
+  # Get item by ID
+  - name: get_item_by_id
+    persona: default
+    description: Retrieve a specific item by its ID
+    code_type: select
+    code: |
+      SELECT 
+          item_id,
+          item_name,
+          item_department,
+          item_section,
+          item_size,
+          item_colour
+      FROM item_table
+      WHERE item_id = :item_id
+    input_schema:
+      type: object
+      properties:
+        item_id:
+          type: integer
+          description: The unique identifier of the item
+      required:
+        - item_id
+
+  # Get all stores
+  - name: get_all_stores
+    persona: default
+    description: Retrieve all store and depot locations
+    code_type: select
+    code: |
+      SELECT 
+          loc_id,
+          loc_type,
+          loc_name,
+          loc_country,
+          loc_town
+      FROM location_table
+      ORDER BY loc_id
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+
+  # Get store by ID
+  - name: get_store_by_id
+    persona: default
+    description: Retrieve a specific store or depot by its location ID
+    code_type: select
+    code: |
+      SELECT 
+          loc_id,
+          loc_type,
+          loc_name,
+          loc_country,
+          loc_town
+      FROM location_table
+      WHERE loc_id = :loc_id
+    input_schema:
+      type: object
+      properties:
+        loc_id:
+          type: integer
+          description: The unique identifier of the location
+      required:
+        - loc_id
+
+  # Get items by department
+  - name: get_items_by_department
+    persona: default
+    description: Retrieve all items in a specific department
+    code_type: select
+    code: |
+      SELECT 
+          item_id,
+          item_name,
+          item_department,
+          item_section,
+          item_size,
+          item_colour
+      FROM item_table
+      WHERE item_department = :department
+      ORDER BY item_id
+    input_schema:
+      type: object
+      properties:
+        department:
+          type: string
+          description: The department name (e.g., Men's, Women's, Children's, Footwear, Accessories)
+      required:
+        - department
+
+  # Get stores by type
+  - name: get_stores_by_type
+    persona: default
+    description: Retrieve all locations of a specific type (STORE or DEPOT)
+    code_type: select
+    code: |
+      SELECT 
+          loc_id,
+          loc_type,
+          loc_name,
+          loc_country,
+          loc_town
+      FROM location_table
+      WHERE loc_type = :loc_type
+      ORDER BY loc_id
+    input_schema:
+      type: object
+      properties:
+        loc_type:
+          type: string
+          description: The location type (STORE or DEPOT)
+          enum:
+            - STORE
+            - DEPOT
+      required:
+        - loc_type
+
+  # Get items by section
+  - name: get_items_by_section
+    persona: default
+    description: Retrieve all items in a specific section
+    code_type: select
+    code: |
+      SELECT 
+          item_id,
+          item_name,
+          item_department,
+          item_section,
+          item_size,
+          item_colour
+      FROM item_table
+      WHERE item_section = :section
+      ORDER BY item_id
+    input_schema:
+      type: object
+      properties:
+        section:
+          type: string
+          description: The section name
+      required:
+        - section
+
+  # Get stores by town
+  - name: get_stores_by_town
+    persona: default
+    description: Retrieve all stores in a specific town
+    code_type: select
+    code: |
+      SELECT 
+          loc_id,
+          loc_type,
+          loc_name,
+          loc_country,
+          loc_town
+      FROM location_table
+      WHERE loc_town = :town
+      ORDER BY loc_id
+    input_schema:
+      type: object
+      properties:
+        town:
+          type: string
+          description: The town name
+      required:
+        - town
+
+  # Get items by colour
+  - name: get_items_by_colour
+    persona: default
+    description: Retrieve all items of a specific colour
+    code_type: select
+    code: |
+      SELECT 
+          item_id,
+          item_name,
+          item_department,
+          item_section,
+          item_size,
+          item_colour
+      FROM item_table
+      WHERE item_colour = :colour
+      ORDER BY item_id
+    input_schema:
+      type: object
+      properties:
+        colour:
+          type: string
+          description: The colour name (Black, White, or Grey)
+          enum:
+            - Black
+            - White
+            - Grey
+      required:
+        - colour

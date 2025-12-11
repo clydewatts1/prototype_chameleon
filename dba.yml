@@ -1,0 +1,110 @@
+# DBA Tools for Database Administration
+# These tools provide metadata queries for database inspection
+
+tools:
+  # List all tables in the database
+  - name: list_all_tables
+    persona: default
+    description: List all tables in the database (excluding system objects)
+    code_type: select
+    code: |
+      SELECT 
+          name as table_name,
+          type,
+          sql as create_statement
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name NOT LIKE 'sqlite_%'
+      ORDER BY name
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+
+  # Get columns for a specific table
+  - name: get_table_columns
+    persona: default
+    description: Get detailed column information for a specific table including column names, types, and constraints
+    code_type: select
+    code: |
+      SELECT 
+          cid as column_id,
+          name as column_name,
+          type as column_type,
+          "notnull" as not_null,
+          dflt_value as default_value,
+          pk as primary_key
+      FROM pragma_table_info(:table_name)
+      ORDER BY cid
+    input_schema:
+      type: object
+      properties:
+        table_name:
+          type: string
+          description: The name of the table to inspect
+      required:
+        - table_name
+
+  # Get table row count
+  - name: get_table_row_count
+    persona: default
+    description: Get the number of rows in a specific table
+    code_type: select
+    code: |
+      SELECT 
+          :table_name as table_name,
+          COUNT(*) as row_count
+      FROM {table_name}
+    input_schema:
+      type: object
+      properties:
+        table_name:
+          type: string
+          description: The name of the table to count rows from
+      required:
+        - table_name
+
+  # Get database schema summary
+  - name: get_schema_summary
+    persona: default
+    description: Get a summary of all tables with their column information
+    code_type: select
+    code: |
+      SELECT 
+          m.name as table_name,
+          p.cid as column_id,
+          p.name as column_name,
+          p.type as column_type,
+          p."notnull" as not_null,
+          p.pk as is_primary_key
+      FROM sqlite_master m
+      LEFT JOIN pragma_table_info(m.name) p
+      WHERE m.type = 'table' 
+        AND m.name NOT LIKE 'sqlite_%'
+      ORDER BY m.name, p.cid
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+
+  # List primary keys for a table
+  - name: get_table_primary_keys
+    persona: default
+    description: Get primary key information for a specific table
+    code_type: select
+    code: |
+      SELECT 
+          name as column_name,
+          type as column_type,
+          "notnull" as not_null
+      FROM pragma_table_info(:table_name)
+      WHERE pk > 0
+      ORDER BY pk
+    input_schema:
+      type: object
+      properties:
+        table_name:
+          type: string
+          description: The name of the table to inspect
+      required:
+        - table_name
