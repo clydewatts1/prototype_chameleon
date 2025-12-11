@@ -110,8 +110,12 @@ class SqlCreatorTool(ChameleonTool):
             return f"Error: sql_query must start with SELECT. Got: {sql_stripped[:50]}..."
         
         # Validation 3: Check for semicolons (to prevent chaining DROP statements)
-        # Allow trailing semicolons, but not in the middle
-        sql_no_trailing = sql_stripped.rstrip().rstrip(';').rstrip()
+        # Remove all SQL comments first to prevent comment-based bypasses
+        sql_no_comments = re.sub(r'--[^\\n]*', '', sql_stripped)  # Single-line comments
+        sql_no_comments = re.sub(r'/\\*.*?\\*/', '', sql_no_comments, flags=re.DOTALL)  # Multi-line comments
+        
+        # Allow trailing semicolons only, not in the middle
+        sql_no_trailing = sql_no_comments.rstrip().rstrip(';').rstrip()
         if ';' in sql_no_trailing:
             return "Error: sql_query cannot contain semicolons (;) in the middle. Only single statements are allowed."
         
