@@ -49,7 +49,14 @@ The project consists of the following main components:
    - Computes hashes and syncs to database
    - Supports `--clean` flag for resetting database
 
-6. **seed_db.py**: Legacy Python-based seeding utility (deprecated)
+6. **export_specs.py**: Database export utility
+   - Exports the current state of the database to YAML format
+   - Serializes tools, resources, and prompts with their associated code
+   - Uses block-style YAML for readable multiline code blocks
+   - Supports `--persona` flag for filtering by persona
+   - Enables "snapshotting" the AI agent's learned capabilities
+
+7. **seed_db.py**: Legacy Python-based seeding utility (deprecated)
    - Populates database with hardcoded sample tools, resources, and prompts
    - Retained for backward compatibility
 
@@ -259,7 +266,45 @@ python seed_db.py
 
 This will clear existing data and repopulate the database with hardcoded sample tools, resources, and prompts.
 
-### 4. Run the Admin GUI (Optional)
+### 4. Export Database Specifications
+
+You can export the current state of your database to a YAML file, enabling you to:
+- Create snapshots of your AI agent's learned capabilities
+- Back up your tool configurations
+- Share tool definitions with others
+- Migrate tools between environments
+
+```bash
+# Export all tools, resources, and prompts to stdout
+python export_specs.py
+
+# Save export to a file
+python export_specs.py > my_agent_snapshot.yaml
+
+# Export only tools for a specific persona
+python export_specs.py --persona assistant > assistant_tools.yaml
+
+# Export from a custom database
+python export_specs.py --database sqlite:///mydb.db > export.yaml
+
+# View help
+python export_specs.py --help
+```
+
+The exported YAML file uses the same format as `specs.yaml`, so you can load it back using `load_specs.py`:
+
+```bash
+# Load an exported snapshot into a new database
+python load_specs.py my_agent_snapshot.yaml --database sqlite:///restored.db
+```
+
+**Key Features:**
+- Uses block-style (|) for multiline code blocks for readability
+- Maintains JSON structure for input schemas
+- Handles missing code hashes gracefully
+- Outputs to stdout for easy redirection
+
+### 5. Run the Admin GUI (Optional)
 
 Manage your tools and database using the Streamlit admin interface:
 
@@ -291,7 +336,7 @@ streamlit run admin_gui.py
 streamlit run admin_gui.py
 ```
 
-### 5. Interact with the Server
+### 6. Interact with the Server
 
 The server implements the MCP protocol and supports:
 
