@@ -6,7 +6,7 @@ This module defines the database schema for storing code and tool configurations
 
 from sqlmodel import Field, SQLModel, create_engine, Column
 from sqlalchemy import JSON, Text
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from config import load_config
 
 # Load configuration at module level
@@ -166,7 +166,7 @@ class ExecutionLog(SQLModel, table=True):
     __table_args__ = _schema_arg
     
     id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of execution (UTC)")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of execution (UTC)")
     tool_name: str = Field(description="Name of the tool executed")
     persona: str = Field(description="Persona context")
     arguments: dict = Field(sa_column=Column(JSON), description="Input arguments (JSON)")

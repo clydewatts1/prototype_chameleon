@@ -21,6 +21,7 @@ import ast
 import hashlib
 import inspect
 import re
+import sys
 import traceback
 import json
 from typing import Any, Dict, List, Union
@@ -167,9 +168,12 @@ def log_execution(
     try:
         # Serialize arguments to JSON-compatible format
         try:
-            args_json = json.loads(json.dumps(arguments, default=str))
-        except Exception:
-            # If serialization fails, use string representation
+            # Attempt to serialize with default=str fallback for non-standard types
+            json.dumps(arguments, default=str)
+            args_json = arguments
+        except (TypeError, ValueError) as e:
+            # If serialization fails, log error and use string representation
+            print(f"[ExecutionLog] Warning: Failed to serialize arguments: {e}", file=sys.stderr)
             args_json = {"_serialization_error": str(arguments)}
         
         # Format result summary (truncate to ~2000 chars)
@@ -200,7 +204,7 @@ def log_execution(
     except Exception as e:
         # If logging fails, don't crash the execution
         # Just print an error message
-        print(f"[ExecutionLog] Warning: Failed to log execution: {e}", file=__import__('sys').stderr)
+        print(f"[ExecutionLog] Warning: Failed to log execution: {e}", file=sys.stderr)
         try:
             db_session.rollback()
         except Exception:
