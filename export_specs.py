@@ -29,14 +29,6 @@ class LiteralString(str):
     pass
 
 
-def literal_presenter(dumper, data):
-    """Custom YAML presenter for literal block scalars."""
-    # Always use block style (|) for multiline strings to keep them readable
-    if '\n' in data:
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
-
-
 def _export_tools(session: Session, persona: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Export all tools from ToolRegistry.
@@ -226,8 +218,14 @@ def main():
         class LiteralDumper(yaml.Dumper):
             pass
         
-        def my_literal_presenter(dumper, data):
-            """Inline literal presenter - use block style for multiline."""
+        def literal_presenter(dumper, data):
+            """
+            Custom YAML presenter for literal block scalars.
+            
+            Uses block style (|) for multiline strings to keep them readable.
+            Note: PyYAML preserves trailing whitespace by using quoted strings
+            instead of block scalars when necessary.
+            """
             if isinstance(data, LiteralString) and '\n' in data:
                 return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
             elif isinstance(data, str) and '\n' in data:
@@ -236,12 +234,13 @@ def main():
             return dumper.represent_scalar('tag:yaml.org,2002:str', data)
         
         # Register representer for both str and LiteralString
-        LiteralDumper.add_representer(str, my_literal_presenter)
-        LiteralDumper.add_representer(LiteralString, my_literal_presenter)
+        LiteralDumper.add_representer(str, literal_presenter)
+        LiteralDumper.add_representer(LiteralString, literal_presenter)
         
         # Print YAML to stdout with custom dumper
-        # Use width=float("inf") to prevent line wrapping
-        yaml.dump(specs, sys.stdout, Dumper=LiteralDumper, default_flow_style=False, sort_keys=False, allow_unicode=True, width=float("inf"))
+        # Use reasonable width limit (200 chars) to prevent excessively long lines
+        yaml.dump(specs, sys.stdout, Dumper=LiteralDumper, default_flow_style=False, 
+                  sort_keys=False, allow_unicode=True, width=200)
         
     except Exception as e:
         print(f"❌ Error exporting specifications: {e}", file=sys.stderr)
