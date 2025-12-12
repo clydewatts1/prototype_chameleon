@@ -414,7 +414,7 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
     results = []
     for tool in tools:
         desc = tool.description
-        if getattr(tool, "is_auto_created", False):
+        if tool.is_auto_created:
             desc = f"[AUTO-BUILD] {desc}"
         
         results.append({

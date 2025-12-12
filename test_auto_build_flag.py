@@ -70,7 +70,7 @@ tools:
             )
             tool = session.exec(statement).first()
             
-            if tool and tool.is_auto_created == False:
+            if tool and tool.is_auto_created is False:
                 print("  ✅ System tool has is_auto_created=False")
                 print(f"     Tool: {tool.tool_name}")
                 print(f"     is_auto_created: {tool.is_auto_created}")
@@ -429,7 +429,7 @@ def test_update_preserves_flag():
             )
             tool = session.exec(statement).first()
             
-            if tool and tool.is_auto_created == True:
+            if tool and tool.is_auto_created is True:
                 print("  ✅ Updated tool still has is_auto_created=True")
                 print(f"     Tool: {tool.tool_name}")
                 print(f"     Description: {tool.description}")
