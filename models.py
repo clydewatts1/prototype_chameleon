@@ -84,6 +84,7 @@ class ToolRegistry(SQLModel, table=True):
         description: Description of what the tool does
         input_schema: JSON Schema for the tool arguments (stored as dict/JSON)
         active_hash_ref: Foreign key reference to CodeVault hash
+        is_auto_created: True if tool was created by the LLM, False if system/prebuilt
     """
     __tablename__ = _table_config.get('tool_registry', 'toolregistry')
     __table_args__ = _schema_arg
@@ -96,6 +97,7 @@ class ToolRegistry(SQLModel, table=True):
         foreign_key=_get_foreign_key('code_vault', 'hash'),
         description="Reference to CodeVault hash"
     )
+    is_auto_created: bool = Field(default=False, description="True if tool was created by the LLM, False if system/prebuilt")
 
 
 class ResourceRegistry(SQLModel, table=True):

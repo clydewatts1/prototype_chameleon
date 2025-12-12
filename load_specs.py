@@ -119,6 +119,7 @@ def _upsert_tool(session: Session, tool_data: Dict[str, Any]) -> None:
         existing.description = tool_data['description']
         existing.input_schema = tool_data.get('input_schema', {})
         existing.active_hash_ref = code_hash
+        existing.is_auto_created = False
         session.add(existing)
         print(f"   ✅ Tool '{tool_name}' updated (hash: {code_hash[:16]}...)")
     else:
@@ -128,7 +129,8 @@ def _upsert_tool(session: Session, tool_data: Dict[str, Any]) -> None:
             target_persona=persona,
             description=tool_data['description'],
             input_schema=tool_data.get('input_schema', {}),
-            active_hash_ref=code_hash
+            active_hash_ref=code_hash,
+            is_auto_created=False
         )
         session.add(tool)
         print(f"   ✅ Tool '{tool_name}' created (hash: {code_hash[:16]}...)")
