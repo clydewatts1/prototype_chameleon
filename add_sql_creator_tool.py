@@ -179,6 +179,7 @@ class SqlCreatorTool(ChameleonTool):
                 existing_tool.description = description
                 existing_tool.input_schema = input_schema
                 existing_tool.active_hash_ref = code_hash
+                existing_tool.is_auto_created = True
                 self.db_session.add(existing_tool)
                 self.log(f"Tool '{tool_name}' updated in ToolRegistry")
             else:
@@ -188,7 +189,8 @@ class SqlCreatorTool(ChameleonTool):
                     target_persona='default',
                     description=description,
                     input_schema=input_schema,
-                    active_hash_ref=code_hash
+                    active_hash_ref=code_hash,
+                    is_auto_created=True
                 )
                 self.db_session.add(tool)
                 self.log(f"Tool '{tool_name}' created in ToolRegistry")

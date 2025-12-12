@@ -411,14 +411,19 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
     statement = select(ToolRegistry).where(ToolRegistry.target_persona == persona)
     tools = db_session.exec(statement).all()
     
-    return [
-        {
+    results = []
+    for tool in tools:
+        desc = tool.description
+        if tool.is_auto_created:
+            desc = f"[AUTO-BUILD] {desc}"
+        
+        results.append({
             'name': tool.tool_name,
-            'description': tool.description,
+            'description': desc,
             'input_schema': tool.input_schema,
-        }
-        for tool in tools
-    ]
+        })
+    
+    return results
 
 
 def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
