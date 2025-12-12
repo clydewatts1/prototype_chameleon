@@ -1,0 +1,5 @@
+streamlit
+mcp
+google-generativeai
+ollama
+python-dotenv
