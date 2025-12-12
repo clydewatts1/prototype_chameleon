@@ -99,9 +99,13 @@ The `retail_tools.yaml` file defines four MCP tools for querying the data:
 3. **`get_stock_status`**: Check stock levels for an item at a location
 4. **`get_daily_sales_summary`**: Get daily sales summary across all stores
 
-To load these tools into the MCP server:
+To load these tools into the MCP server (from the project root directory):
 ```bash
+# From project root
 python server/load_specs.py samples/retail/retail_tools.yaml
+
+# Or with absolute path
+python /path/to/server/load_specs.py /path/to/samples/retail/retail_tools.yaml
 ```
 
 ## Example Queries
