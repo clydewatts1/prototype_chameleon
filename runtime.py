@@ -21,12 +21,15 @@ import ast
 import hashlib
 import inspect
 import re
+import sys
+import traceback
+import json
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
 from sqlalchemy import text
 from mcp.types import AnyUrl
 from jinja2 import Template
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog
 from base import ChameleonTool
 
 
@@ -133,6 +136,81 @@ def _validate_read_only(sql: str) -> None:
             )
 
 
+def log_execution(
+    tool_name: str,
+    persona: str,
+    arguments: Dict[str, Any],
+    status: str,
+    result: Any = None,
+    error_traceback_str: str = None,
+    db_session: Session = None
+) -> None:
+    """
+    Log tool execution to the ExecutionLog table.
+    
+    This function handles its own commits to ensure logs persist even if the
+    main tool execution fails or rolls back. This is critical for the "Black Box"
+    Recorder pattern - we need to capture failure information even when the
+    transaction fails.
+    
+    Args:
+        tool_name: Name of the tool executed
+        persona: Persona context
+        arguments: Input arguments dict
+        status: "SUCCESS" or "FAILURE"
+        result: The result of execution (for success cases)
+        error_traceback_str: Full Python traceback string (for failure cases)
+        db_session: SQLModel Session for database access
+    """
+    if db_session is None:
+        return
+    
+    try:
+        # Serialize arguments to JSON-compatible format
+        try:
+            # Attempt to serialize with default=str fallback for non-standard types
+            json.dumps(arguments, default=str)
+            args_json = arguments
+        except (TypeError, ValueError) as e:
+            # If serialization fails, log error and use string representation
+            print(f"[ExecutionLog] Warning: Failed to serialize arguments: {e}", file=sys.stderr)
+            args_json = {"_serialization_error": str(arguments)}
+        
+        # Format result summary (truncate to ~2000 chars)
+        if status == "SUCCESS":
+            result_str = str(result)
+            if len(result_str) > 2000:
+                result_summary = result_str[:2000] + "... (truncated)"
+            else:
+                result_summary = result_str
+        else:
+            result_summary = "Execution failed - see error_traceback"
+        
+        # Create execution log entry
+        log_entry = ExecutionLog(
+            tool_name=tool_name,
+            persona=persona,
+            arguments=args_json,
+            status=status,
+            result_summary=result_summary,
+            error_traceback=error_traceback_str
+        )
+        
+        # Add and commit in its own transaction
+        # This ensures the log persists even if the main transaction rolls back
+        db_session.add(log_entry)
+        db_session.commit()
+        
+    except Exception as e:
+        # If logging fails, don't crash the execution
+        # Just print an error message
+        print(f"[ExecutionLog] Warning: Failed to log execution: {e}", file=sys.stderr)
+        try:
+            db_session.rollback()
+        except Exception:
+            pass
+
+
 def validate_code_structure(code_str: str) -> None:
     """
     Validate that Python code only contains safe top-level nodes.
@@ -176,6 +254,7 @@ def execute_tool(
     2. Fetches CodeVault content using the hash
     3. Re-hashes the content for security validation
     4. Executes the code in a sandboxed environment
+    5. Logs execution (SUCCESS or FAILURE) to ExecutionLog
     
     Args:
         tool_name: Name of the tool to execute
@@ -190,88 +269,129 @@ def execute_tool(
         ToolNotFoundError: If the tool is not found in the registry
         SecurityError: If hash validation fails
     """
-    # Query ToolRegistry for the tool
-    statement = select(ToolRegistry).where(
-        ToolRegistry.tool_name == tool_name,
-        ToolRegistry.target_persona == persona
-    )
-    tool = db_session.exec(statement).first()
-    
-    if not tool:
-        raise ToolNotFoundError(
-            f"Tool '{tool_name}' not found for persona '{persona}'"
+    try:
+        # Query ToolRegistry for the tool
+        statement = select(ToolRegistry).where(
+            ToolRegistry.tool_name == tool_name,
+            ToolRegistry.target_persona == persona
         )
-    
-    # Fetch CodeVault content using the hash
-    statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
-    code_vault = db_session.exec(statement).first()
-    
-    if not code_vault:
-        raise ToolNotFoundError(
-            f"Code not found for hash '{tool.active_hash_ref}'"
-        )
-    
-    # Security: Re-hash the content and validate
-    computed_hash = _compute_hash(code_vault.code_blob)
-    if computed_hash != code_vault.hash:
-        raise SecurityError(
-            f"Hash mismatch! Expected '{code_vault.hash}', "
-            f"got '{computed_hash}'. Code may be corrupted."
-        )
-    
-    # Execute based on code type
-    if code_vault.code_type == 'select':
-        # Step 1: Render SQL template with Jinja2 for structural logic
-        # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
-        # Values must use SQLAlchemy parameter binding with :param_name syntax
-        template = Template(code_vault.code_blob)
-        rendered_sql = template.render(arguments=arguments)
+        tool = db_session.exec(statement).first()
         
-        # Step 2: Security validation
-        # Validate single statement (no SQL injection via multiple statements)
-        _validate_single_statement(rendered_sql)
-        
-        # Validate read-only (only SELECT statements allowed)
-        _validate_read_only(rendered_sql)
-        
-        # Step 3: Safe execution with SQLAlchemy parameter binding
-        # The rendered SQL should use :param_name syntax for values
-        # Pass arguments dictionary to db_session.exec() as params for safe binding
-        result = db_session.exec(text(rendered_sql), params=arguments).all()
-        return result
-    else:
-        # Default to python execution with class-based plugin architecture
-        # Step 1: Validate code structure
-        validate_code_structure(code_vault.code_blob)
-        
-        # Step 2: Execute the code to load the class definition
-        # Create a namespace with base class available
-        namespace = {'ChameleonTool': ChameleonTool}
-        exec(code_vault.code_blob, namespace)
-        
-        # Step 3: Find the class that inherits from ChameleonTool
-        tool_class = None
-        for name, obj in namespace.items():
-            if (inspect.isclass(obj) and 
-                issubclass(obj, ChameleonTool) and 
-                obj is not ChameleonTool):
-                tool_class = obj
-                break
-        
-        if tool_class is None:
-            raise SecurityError(
-                "No class inheriting from ChameleonTool found in the code"
+        if not tool:
+            raise ToolNotFoundError(
+                f"Tool '{tool_name}' not found for persona '{persona}'"
             )
         
-        # Step 4: Instantiate the tool with db_session and context
-        context = {
-            'persona': persona,
-            'tool_name': tool_name,
-        }
-        tool_instance = tool_class(db_session, context)
+        # Fetch CodeVault content using the hash
+        statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
+        code_vault = db_session.exec(statement).first()
         
-        # Step 5: Execute the tool's run method
-        return tool_instance.run(arguments)
+        if not code_vault:
+            raise ToolNotFoundError(
+                f"Code not found for hash '{tool.active_hash_ref}'"
+            )
+        
+        # Security: Re-hash the content and validate
+        computed_hash = _compute_hash(code_vault.code_blob)
+        if computed_hash != code_vault.hash:
+            raise SecurityError(
+                f"Hash mismatch! Expected '{code_vault.hash}', "
+                f"got '{computed_hash}'. Code may be corrupted."
+            )
+        
+        # Execute based on code type
+        if code_vault.code_type == 'select':
+            # Step 1: Render SQL template with Jinja2 for structural logic
+            # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
+            # Values must use SQLAlchemy parameter binding with :param_name syntax
+            template = Template(code_vault.code_blob)
+            rendered_sql = template.render(arguments=arguments)
+            
+            # Step 2: Security validation
+            # Validate single statement (no SQL injection via multiple statements)
+            _validate_single_statement(rendered_sql)
+            
+            # Validate read-only (only SELECT statements allowed)
+            _validate_read_only(rendered_sql)
+            
+            # Step 3: Safe execution with SQLAlchemy parameter binding
+            # The rendered SQL should use :param_name syntax for values
+            # Pass arguments dictionary to db_session.exec() as params for safe binding
+            result = db_session.exec(text(rendered_sql), params=arguments).all()
+            
+            # Log success
+            log_execution(
+                tool_name=tool_name,
+                persona=persona,
+                arguments=arguments,
+                status="SUCCESS",
+                result=result,
+                db_session=db_session
+            )
+            
+            return result
+        else:
+            # Default to python execution with class-based plugin architecture
+            # Step 1: Validate code structure
+            validate_code_structure(code_vault.code_blob)
+            
+            # Step 2: Execute the code to load the class definition
+            # Create a namespace with base class available
+            namespace = {'ChameleonTool': ChameleonTool}
+            exec(code_vault.code_blob, namespace)
+            
+            # Step 3: Find the class that inherits from ChameleonTool
+            tool_class = None
+            for name, obj in namespace.items():
+                if (inspect.isclass(obj) and 
+                    issubclass(obj, ChameleonTool) and 
+                    obj is not ChameleonTool):
+                    tool_class = obj
+                    break
+            
+            if tool_class is None:
+                raise SecurityError(
+                    "No class inheriting from ChameleonTool found in the code"
+                )
+            
+            # Step 4: Instantiate the tool with db_session and context
+            context = {
+                'persona': persona,
+                'tool_name': tool_name,
+            }
+            tool_instance = tool_class(db_session, context)
+            
+            # Step 5: Execute the tool's run method
+            result = tool_instance.run(arguments)
+            
+            # Log success
+            log_execution(
+                tool_name=tool_name,
+                persona=persona,
+                arguments=arguments,
+                status="SUCCESS",
+                result=result,
+                db_session=db_session
+            )
+            
+            return result
+            
+    except Exception as e:
+        # Capture the full traceback
+        error_traceback_str = traceback.format_exc()
+        
+        # Log failure
+        log_execution(
+            tool_name=tool_name,
+            persona=persona,
+            arguments=arguments,
+            status="FAILURE",
+            error_traceback_str=error_traceback_str,
+            db_session=db_session
+        )
+        
+        # Re-raise the exception so the client knows it failed
+        raise
 
 
 def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
