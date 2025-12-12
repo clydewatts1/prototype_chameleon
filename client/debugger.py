@@ -24,7 +24,7 @@ try:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 except ImportError:
-    st.error("MCP library not installed. Run: pip install mcp")
+    st.error("MCP library not installed. Run: pip install -r requirements.txt")
     st.stop()
 
 # Import LLM providers
@@ -115,15 +115,24 @@ def setup_llm_provider():
     elif provider == "Ollama":
         model_name = st.sidebar.text_input("Model Name", value="llama3")
         if model_name:
-            try:
-                # Test connection
-                ollama.list()
+            # Cache the Ollama connection check
+            if "ollama_connected" not in st.session_state:
+                try:
+                    # Test connection once
+                    ollama.list()
+                    st.session_state.ollama_connected = True
+                except Exception as e:
+                    st.session_state.ollama_connected = False
+                    st.sidebar.error(f"Error connecting to Ollama: {e}")
+                    return None
+            
+            if st.session_state.ollama_connected:
                 st.session_state.state.llm_provider = "Ollama"
                 st.session_state.state.llm_client = model_name
                 st.sidebar.success(f"✅ Ollama configured (model: {model_name})")
                 return model_name
-            except Exception as e:
-                st.sidebar.error(f"Error connecting to Ollama: {e}")
+            else:
+                st.sidebar.error("Ollama connection failed")
                 return None
         else:
             st.sidebar.warning("Please enter model name")
@@ -233,7 +242,27 @@ async def call_mcp_tool(session: ClientSession, tool_name: str, arguments: Dict)
 
 
 async def chat_with_mcp(user_message: str):
-    """Main agent loop: Connect to MCP, list tools, interact with LLM"""
+    """
+    Main agent loop: Connect to MCP, list tools, interact with LLM.
+    
+    This function implements the complete agent workflow:
+    1. Connects to the MCP server via stdio
+    2. Lists available tools from the server
+    3. Translates tools to LLM-compatible format
+    4. Sends user message with tools to the LLM
+    5. Handles tool calls if the LLM decides to use them
+    6. Displays results and final response
+    
+    Args:
+        user_message: The user's question or request
+        
+    Returns:
+        None (updates UI directly via Streamlit)
+        
+    Raises:
+        Exception: Any errors during MCP connection or LLM interaction are caught
+                  and displayed in the UI
+    """
     state = st.session_state.state
     
     if not state.llm_client:
