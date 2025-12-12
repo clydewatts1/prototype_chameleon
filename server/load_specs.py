@@ -14,6 +14,7 @@ from typing import Any, Dict
 
 import yaml
 from sqlmodel import Session, select
+from sqlalchemy import text
 
 from config import load_config
 from models import (
@@ -258,6 +259,21 @@ def load_specs_from_yaml(yaml_path: str, database_url: str, clean: bool = False)
     # Create engine and tables
     engine = get_engine(database_url)
     create_db_and_tables(engine)
+
+    # Ensure schema is up-to-date for ToolRegistry
+    try:
+        with Session(engine) as session:
+            # Check if 'is_auto_created' exists in toolregistry
+            cols = session.exec(text("PRAGMA table_info(toolregistry)")).all()
+            col_names = {row[1] for row in cols} if cols else set()
+            if 'is_auto_created' not in col_names:
+                print("\n⚙️  Reconciling schema: adding column 'is_auto_created' to toolregistry...")
+                session.exec(text("ALTER TABLE toolregistry ADD COLUMN is_auto_created BOOLEAN NOT NULL DEFAULT 0"))
+                session.commit()
+                print("✅ Column 'is_auto_created' added")
+    except Exception as e:
+        # Non-fatal: continue; detailed error shown for awareness
+        print(f"\n⚠️  Schema reconciliation skipped: {e}")
     
     try:
         with Session(engine) as session:

@@ -53,6 +53,30 @@ streamlit run debugger.py
 
 See [client/README.md](client/README.md) for detailed client documentation.
 
+## Schema Migration & Specs Loader
+
+The specs loader (server/load_specs.py) creates tables and synchronizes tools/resources/prompts from YAML (e.g., server/specs.yaml, server/retail.yml). It also performs a light schema reconciliation for SQLite to keep the `toolregistry` table compatible across versions.
+
+- Auto-migration: If the `toolregistry.is_auto_created` column is missing, the loader adds it automatically (BOOLEAN NOT NULL DEFAULT 0). This prevents errors when loading specs after upgrading code.
+- Clean load: Use `--clean` to clear existing rows before reloading specs.
+
+Examples (PowerShell):
+
+```powershell
+# Load default specs from server/specs.yaml
+python .\server\load_specs.py .\server\specs.yaml
+
+# Load and clear existing data first
+python .\server\load_specs.py .\server\specs.yaml --clean
+
+# Load a different spec file (e.g., retail tools)
+python .\server\load_specs.py .\server\retail.yml
+```
+
+Notes:
+- The database URL is taken from config.yaml by default. Override with `--database` if needed.
+- The loader will create tables if they don’t exist. For SQLite, schema changes are applied minimally to preserve data.
+
 ## What's Included
 
 ### MCP Server (`server/`)
