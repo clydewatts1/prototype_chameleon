@@ -81,12 +81,19 @@ Notes:
 
 ### MCP Server (`server/`)
 
-A dynamic MCP server that:
+A dynamic MCP server featuring:
+
+**Core Capabilities:**
 - Stores tools, resources, and prompts in a database
 - Supports persona-based filtering
-- Provides secure code execution
-- Offers YAML-based configuration
-- Includes comprehensive testing suite
+- YAML-based configuration
+- Comprehensive testing suite
+
+**Advanced Features:**
+- **Jinja2 + SQLAlchemy SQL**: Secure dynamic SQL queries with Jinja2 for structure and parameter binding for values
+- **SQL Creator Meta-Tool**: LLMs can create new SQL tools dynamically at runtime
+- **Deep Execution Audit**: Full traceback logging for AI self-diagnosis and self-healing
+- **Auto-Created Tool Tracking**: `is_auto_created` flag distinguishes LLM-created vs. system tools
 
 ### AI-Powered Debugger (`client/`)
 
@@ -97,12 +104,87 @@ A Streamlit GUI that:
 - Displays tool execution details
 - Captures protocol messages for inspection
 
+## Key Features
+
+### 1. Jinja2 + SQLAlchemy for Secure Dynamic SQL
+
+Create SQL tools with optional filters using Jinja2 templates for structure and parameter binding for values:
+
+```sql
+SELECT * FROM sales
+WHERE 1=1
+{% if arguments.store_name %}
+  AND store_name = :store_name
+{% endif %}
+{% if arguments.min_amount %}
+  AND amount >= :min_amount
+{% endif %}
+ORDER BY date DESC
+```
+
+- **Jinja2**: Controls SQL structure (optional WHERE clauses)
+- **SQLAlchemy**: Safely binds values to prevent SQL injection
+- **Security**: Only SELECT statements allowed, single statement validation
+
+See [server/README.md](server/README.md) for complete documentation.
+
+### 2. Self-Modifying AI Agent via SQL Creator Meta-Tool
+
+LLMs can create new SQL tools dynamically at runtime:
+
+```json
+{
+  "tool_name": "search_inventory",
+  "description": "Search inventory with optional category filter",
+  "sql_query": "SELECT * FROM inventory WHERE 1=1 {% if arguments.category %} AND category = :category {% endif %}",
+  "parameters": {
+    "category": {"type": "string", "required": false}
+  }
+}
+```
+
+- Created tools are immediately available
+- Enforces strict security (SELECT-only, single statement)
+- Tools marked with `is_auto_created=true` flag for tracking
+
+See [server/SQL_CREATOR_TOOL_README.md](server/SQL_CREATOR_TOOL_README.md) for complete documentation.
+
+### 3. Deep Execution Audit for AI Self-Healing
+
+Comprehensive execution logging enables AI agents to self-diagnose and fix broken tools:
+
+```python
+# AI creates a tool with a bug
+# AI tests the tool → receives generic error
+
+# AI queries for detailed error
+error_info = execute_tool("get_last_error", "default", {"tool_name": "broken_tool"}, session)
+
+# Returns full Python traceback with line numbers:
+# "Traceback (most recent call last):
+#   File "runtime.py", line 361, in execute_tool
+#     result = tool_instance.run(arguments)
+#   File "<string>", line 7, in run
+# ZeroDivisionError: division by zero"
+
+# AI analyzes traceback and fixes the code
+```
+
+- Automatic logging of all executions
+- Full tracebacks with exact line numbers
+- Independent persistence (survives transaction failures)
+- `get_last_error` tool for querying errors
+
+See [server/EXECUTION_LOG_README.md](server/EXECUTION_LOG_README.md) for complete documentation.
+
 ## Use Cases
 
-1. **Interactive Debugging**: Chat with your MCP server to debug issues
-2. **Tool Discovery**: Let AI help you explore available tools
-3. **Protocol Learning**: View raw JSON-RPC messages to understand MCP
-4. **Development Workflow**: Test server changes interactively
+1. **Autonomous AI Agents**: Self-modifying agents that create tools and self-heal when they break
+2. **Interactive Debugging**: Chat with your MCP server to debug issues
+3. **Dynamic Data Analysis**: LLMs create custom SQL queries on the fly
+4. **Tool Discovery**: Let AI help you explore available tools
+5. **Protocol Learning**: View raw JSON-RPC messages to understand MCP
+6. **Development Workflow**: Test server changes interactively
 
 ## Architecture
 
