@@ -82,6 +82,75 @@ For tools that need parameters:
 }
 ```
 
+### Advanced: Using Jinja2 Conditionals for Optional Filters
+
+Created SQL tools support Jinja2 templates for conditional SQL structure. This allows you to make filters optional:
+
+**Important:** Use Jinja2 for SQL **structure** only (e.g., optional WHERE clauses). Always use SQLAlchemy parameter binding (`:param_name`) for **values**.
+
+```json
+{
+  "tool_name": "search_sales",
+  "description": "Search sales with optional filters for store, department, and minimum amount",
+  "sql_query": "SELECT * FROM sales_per_day WHERE 1=1 {% if arguments.store_name %} AND store_name = :store_name {% endif %} {% if arguments.department %} AND department = :department {% endif %} {% if arguments.min_amount %} AND sales_amount >= :min_amount {% endif %} ORDER BY business_date DESC",
+  "parameters": {
+    "store_name": {
+      "type": "string",
+      "description": "Optional filter by store name",
+      "required": false
+    },
+    "department": {
+      "type": "string",
+      "description": "Optional filter by department",
+      "required": false
+    },
+    "min_amount": {
+      "type": "number",
+      "description": "Optional minimum sales amount filter",
+      "required": false
+    }
+  }
+}
+```
+
+**How Jinja2 Works in SQL Tools:**
+
+1. **Template Rendering**: Jinja2 renders the SQL structure first
+   - `{% if arguments.field %}` checks if the argument was provided
+   - Jinja2 conditionally includes or excludes parts of the SQL
+
+2. **Parameter Binding**: After rendering, SQLAlchemy binds values safely
+   - `:param_name` syntax in SQL refers to parameters
+   - Values are passed separately to prevent SQL injection
+
+**Example Flow:**
+
+When called with `{"store_name": "Store A"}`:
+```sql
+-- After Jinja2 rendering:
+SELECT * FROM sales_per_day WHERE 1=1 
+  AND store_name = :store_name 
+ORDER BY business_date DESC
+
+-- After SQLAlchemy binding with {"store_name": "Store A"}:
+-- Safely executes with proper parameter binding
+```
+
+When called with `{}` (no parameters):
+```sql
+-- After Jinja2 rendering (conditionals removed):
+SELECT * FROM sales_per_day WHERE 1=1 
+ORDER BY business_date DESC
+
+-- No parameters to bind
+```
+
+**Security Rules:**
+- ✅ **CORRECT**: `{% if arguments.category %} AND category = :category {% endif %}`
+- ❌ **WRONG**: `AND category = '{{ arguments.category }}'` (SQL injection risk!)
+- ✅ **CORRECT**: Use `:param_name` for all values
+- ❌ **WRONG**: String interpolation or Jinja2 for values
+
 ## Security Features
 
 ### 1. SELECT-Only Validation
