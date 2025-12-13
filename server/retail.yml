@@ -210,10 +210,18 @@ tools:
       properties:
         colour:
           type: string
-          description: The colour name (Black, White, or Grey)
+          description: The colour name (Black, White, or Grey or Primary colours)
           enum:
             - Black
             - White
             - Grey
+            - Red
+            - Blue
+            - Yellow
+            - Green
+            - Orange
+            - Purple
+            - Brown
+            - Pink
       required:
         - colour
