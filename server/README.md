@@ -8,7 +8,10 @@ Chameleon is an innovative MCP server implementation that stores executable code
 
 - **Class-Based Plugin Architecture**: Tools inherit from `ChameleonTool` base class for safety and standardization
 - **Dynamic Tool Registry**: Tools are stored in a database and can be added/modified without server code changes
+- **Self-Modifying Capabilities**: LLMs can create new SQL tools dynamically via meta-tool
 - **YAML Configuration**: Define tools, resources, and prompts in human-readable YAML format
+- **Jinja2 + SQLAlchemy SQL**: Secure dynamic SQL with Jinja2 for structure and parameter binding for values
+- **Deep Execution Audit**: Comprehensive execution logging with full traceback capture for self-healing
 - **Resource Management**: Support for both static and dynamic resources with code execution
 - **Prompt Templates**: Store and format prompt templates with argument substitution
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
@@ -385,7 +388,27 @@ class MyCustomTool(ChameleonTool):
 
 ### SQL-Based Tools
 
-SQL tools use Jinja2 templates for structure and SQLAlchemy parameter binding for values:
+SQL tools use Jinja2 templates for structure and SQLAlchemy parameter binding for values. This hybrid approach provides:
+- **Jinja2 for SQL structure**: Control conditional WHERE clauses, JOINs, and other SQL logic
+- **SQLAlchemy parameter binding**: Safely inject values using `:param_name` syntax
+
+#### Basic SQL SELECT Tool
+
+Simple SELECT queries without conditionals:
+
+```sql
+SELECT 
+    store_name,
+    department,
+    SUM(sales_amount) as total_sales
+FROM sales_per_day
+GROUP BY store_name, department
+ORDER BY total_sales DESC
+```
+
+#### SQL with Jinja2 Conditionals
+
+Use Jinja2 to make parts of the query optional based on provided arguments:
 
 ```sql
 SELECT 
@@ -397,38 +420,187 @@ WHERE 1=1
 {% if arguments.filter_value %}
   AND column1 = :filter_value
 {% endif %}
+{% if arguments.min_amount %}
+  AND amount >= :min_amount
+{% endif %}
 GROUP BY column1, column2
 ORDER BY total DESC
 ```
 
+**How It Works:**
+1. **Structure Rendering (Jinja2)**: The template is rendered first with `arguments` dict available
+   - `{% if arguments.field %}` checks if a field is present in the arguments
+   - Jinja2 controls which parts of the SQL are included
+   - **Never use Jinja2 for values** - only for structure!
+
+2. **Value Binding (SQLAlchemy)**: After rendering, values are bound safely
+   - Use `:param_name` syntax for all values (e.g., `:store_name`, `:min_amount`)
+   - Arguments are passed to SQLAlchemy's `params` parameter
+   - SQLAlchemy handles escaping and prevents SQL injection
+
+#### Complete Example with Multiple Conditionals
+
+```sql
+SELECT 
+    department,
+    SUM(sales_amount) as total_sales,
+    AVG(sales_amount) as avg_sales,
+    COUNT(*) as transaction_count
+FROM sales_per_day
+WHERE 1=1
+{% if arguments.start_date %}
+  AND business_date >= :start_date
+{% endif %}
+{% if arguments.end_date %}
+  AND business_date <= :end_date
+{% endif %}
+{% if arguments.department %}
+  AND department = :department
+{% endif %}
+{% if arguments.min_amount %}
+  AND sales_amount >= :min_amount
+{% endif %}
+GROUP BY department
+ORDER BY total_sales DESC
+```
+
+With input_schema:
+```yaml
+input_schema:
+  type: object
+  properties:
+    start_date:
+      type: string
+      description: Start date in YYYY-MM-DD format (optional)
+    end_date:
+      type: string
+      description: End date in YYYY-MM-DD format (optional)
+    department:
+      type: string
+      description: Filter by department name (optional)
+    min_amount:
+      type: number
+      description: Minimum sales amount filter (optional)
+  required: []
+```
+
+**IMPORTANT - Security Rules:**
+- ✅ **CORRECT**: Use Jinja2 for structure: `{% if arguments.category %} AND category = :category {% endif %}`
+- ❌ **WRONG**: Using Jinja2 for values: `WHERE category = '{{ arguments.category }}'` (SQL injection risk!)
+- ✅ **CORRECT**: Use SQLAlchemy binding: `:category` in SQL, pass via `params` dict
+- ❌ **WRONG**: String interpolation: `f"WHERE category = '{category}'"` (SQL injection risk!)
+
 **Security Features:**
 - Only SELECT statements allowed (read-only)
-- Single statement validation (prevents SQL injection)
-- Parameter binding for all values
+- Single statement validation (prevents SQL injection via statement chaining)
+- Parameter binding for all values (prevents SQL injection via value injection)
+- Comment-aware validation (strips SQL comments before security checks)
+- Jinja2 used only for structural logic, never for values
 
 ### Adding Tools via YAML
 
-Edit `specs.yaml` and run the loader:
+Edit `specs.yaml` and run the loader. Tools support multiple options:
+
+#### Tool Options
+
+**Required Fields:**
+- `name`: Unique tool name (string)
+- `persona`: Target persona (usually "default")
+- `description`: What the tool does (string)
+- `code`: The executable code (Python class or SQL query)
+- `input_schema`: JSON Schema defining the tool's input parameters
+
+**Optional Fields:**
+- `code_type`: Type of code - "python" (default) or "select" (SQL)
+- `is_auto_created`: Automatically set by the system
+  - `false` (default): System/prebuilt tool loaded from YAML
+  - `true`: Tool created dynamically by LLM via `create_new_sql_tool`
+
+#### Python Tool Example
 
 ```yaml
 tools:
   - name: my_tool
     persona: default
-    description: My custom tool
-    code_type: python  # or 'select' for SQL
+    description: My custom Python tool
+    code_type: python  # Optional, defaults to 'python'
     code: |
       from base import ChameleonTool
       
       class MyTool(ChameleonTool):
           def run(self, arguments):
-              return "Hello World"
+              name = arguments.get('name', 'World')
+              self.log(f"Processing {name}")
+              return f"Hello {name}"
     input_schema:
       type: object
       properties:
-        param1:
+        name:
           type: string
-          description: First parameter
-      required: [param1]
+          description: Name to greet
+      required: [name]
+```
+
+#### SQL Tool Example (Basic)
+
+```yaml
+tools:
+  - name: get_all_stores
+    persona: default
+    description: Get all store locations
+    code_type: select  # Must be 'select' for SQL tools
+    code: |
+      SELECT 
+          store_name,
+          location,
+          store_type
+      FROM stores
+      ORDER BY store_name
+    input_schema:
+      type: object
+      properties: {}
+      required: []
+```
+
+#### SQL Tool with Jinja2 Conditionals
+
+```yaml
+tools:
+  - name: search_sales
+    persona: default
+    description: Search sales records with optional filters
+    code_type: select
+    code: |
+      SELECT 
+          business_date,
+          store_name,
+          department,
+          sales_amount
+      FROM sales_per_day
+      WHERE 1=1
+      {% if arguments.store_name %}
+        AND store_name = :store_name
+      {% endif %}
+      {% if arguments.department %}
+        AND department = :department
+      {% endif %}
+      {% if arguments.min_amount %}
+        AND sales_amount >= :min_amount
+      {% endif %}
+      ORDER BY business_date DESC
+    input_schema:
+      type: object
+      properties:
+        store_name:
+          type: string
+          description: Optional filter by store name
+        department:
+          type: string
+          description: Optional filter by department
+        min_amount:
+          type: number
+          description: Optional minimum sales amount
+      required: []  # All parameters optional
 ```
 
 Then load it:
@@ -436,6 +608,392 @@ Then load it:
 ```bash
 python load_specs.py specs.yaml
 ```
+
+## Dynamic Tool Creation and Self-Modification
+
+Chameleon MCP Server includes a powerful meta-tool that allows AI agents to create new SQL-based tools dynamically at runtime. This enables "self-modifying" behavior where the LLM can extend its own capabilities.
+
+### The SQL Creator Meta-Tool
+
+**Tool Name:** `create_new_sql_tool`
+
+**Purpose:** Allows an LLM to dynamically create new SQL SELECT query tools without manual code deployment.
+
+**Key Features:**
+- Creates tools that are immediately available for use
+- Enforces strict security (SELECT-only, single statement)
+- Supports parameterized queries with Jinja2 conditionals
+- Tools are marked with `is_auto_created=true` flag for tracking
+
+### Registering the Meta-Tool
+
+```bash
+python add_sql_creator_tool.py
+```
+
+This registers the `create_new_sql_tool` meta-tool in your database.
+
+### Usage Examples
+
+#### Creating a Simple SQL Tool
+
+```json
+{
+  "tool_name": "get_all_departments",
+  "description": "Get all unique departments from sales data",
+  "sql_query": "SELECT DISTINCT department FROM sales_per_day ORDER BY department",
+  "parameters": {}
+}
+```
+
+#### Creating a Parameterized Tool
+
+```json
+{
+  "tool_name": "get_sales_by_store",
+  "description": "Get sales records filtered by store name",
+  "sql_query": "SELECT * FROM sales_per_day WHERE store_name = :store_name",
+  "parameters": {
+    "store_name": {
+      "type": "string",
+      "description": "Name of the store to filter by",
+      "required": true
+    }
+  }
+}
+```
+
+#### Creating a Tool with Jinja2 Conditionals
+
+```json
+{
+  "tool_name": "search_inventory",
+  "description": "Search inventory with optional filters",
+  "sql_query": "SELECT * FROM inventory WHERE 1=1 {% if arguments.category %} AND category = :category {% endif %} {% if arguments.min_stock %} AND stock_level >= :min_stock {% endif %} ORDER BY item_name",
+  "parameters": {
+    "category": {
+      "type": "string",
+      "description": "Optional category filter",
+      "required": false
+    },
+    "min_stock": {
+      "type": "number",
+      "description": "Optional minimum stock level",
+      "required": false
+    }
+  }
+}
+```
+
+#### Complete Workflow Example
+
+```python
+from sqlmodel import Session
+from models import get_engine
+from runtime import execute_tool
+
+engine = get_engine("sqlite:///chameleon.db")
+
+with Session(engine) as session:
+    # Step 1: Create a new tool
+    result = execute_tool(
+        "create_new_sql_tool",
+        "default",
+        {
+            "tool_name": "get_high_value_sales",
+            "description": "Get sales records above a threshold",
+            "sql_query": "SELECT * FROM sales_per_day WHERE sales_amount >= :threshold ORDER BY sales_amount DESC",
+            "parameters": {
+                "threshold": {
+                    "type": "number",
+                    "description": "Minimum sales amount",
+                    "required": true
+                }
+            }
+        },
+        session
+    )
+    print(result)  # Success: Tool 'get_high_value_sales' has been registered...
+    
+    # Step 2: Use the newly created tool immediately
+    sales = execute_tool(
+        "get_high_value_sales",
+        "default",
+        {"threshold": 1000.0},
+        session
+    )
+    print(f"Found {len(sales)} high-value sales")
+```
+
+### Security Constraints
+
+The meta-tool enforces strict security:
+
+1. **SELECT-Only**: Only read-only SELECT queries allowed
+2. **Single Statement**: Prevents SQL injection via statement chaining (semicolon detection)
+3. **Comment-Aware**: Strips SQL comments before validation to prevent bypasses
+4. **Forced Code Type**: All created tools use `code_type='select'` for runtime validation
+5. **Parameter Binding**: Values must use `:param_name` syntax (SQLAlchemy binding)
+
+**Blocked Examples:**
+- `INSERT INTO users ...` - Write operations not allowed
+- `SELECT * FROM users; DROP TABLE users;` - Multiple statements blocked
+- `UPDATE products SET ...` - Only SELECT allowed
+
+### Tool Tracking: is_auto_created Flag
+
+All tools have an `is_auto_created` flag to distinguish their origin:
+
+- **`is_auto_created=false`**: System/prebuilt tools loaded from YAML files
+- **`is_auto_created=true`**: Tools created dynamically by LLM via `create_new_sql_tool`
+
+This allows you to:
+- Track which tools were created by the AI vs. humans
+- Implement different policies for auto-created tools
+- Audit and review LLM-generated tools
+- Clean up or archive AI-created tools separately
+
+### Best Practices
+
+1. **Descriptive Names**: Use clear tool names (e.g., `get_sales_by_region` not `query1`)
+2. **Good Descriptions**: Detailed descriptions help the LLM know when to use the tool
+3. **Parameter Documentation**: Document each parameter with type and description
+4. **Use Parameters**: Always use `:param_name` syntax for values, never string interpolation
+5. **Test Queries**: Test SQL queries manually before creating tools
+6. **Idempotency**: Safe to create the same tool multiple times (updates existing)
+
+### Limitations
+
+1. **SELECT-Only**: Only read operations (write operations require manual Python tool creation)
+2. **Default Persona**: All SQL creator tools use the "default" persona
+3. **No Python Logic**: Created tools execute SQL only, not custom Python code
+4. **Query Complexity**: No built-in limits on joins, aggregations, or result size
+
+### Documentation
+
+For complete documentation, see:
+- [SQL_CREATOR_TOOL_README.md](SQL_CREATOR_TOOL_README.md) - Detailed usage guide
+- [IMPLEMENTATION_SUMMARY_SQL_CREATOR.md](IMPLEMENTATION_SUMMARY_SQL_CREATOR.md) - Technical implementation details
+
+## Deep Execution Audit and Self-Healing
+
+Chameleon includes a comprehensive execution logging system that enables AI agents to self-diagnose and self-heal when tools fail. This is the **"Black Box" Recorder pattern** - the single most important feature for autonomous agent operation.
+
+### The Problem
+
+When an LLM creates a tool with a bug, it typically receives only a generic error message like "Error: Execution failed". This provides no information about:
+- What went wrong
+- Where in the code the error occurred
+- What inputs caused the failure
+- The exact error type and message
+
+Without this information, the AI cannot fix the problem.
+
+### The Solution: ExecutionLog
+
+The ExecutionLog system automatically records every tool execution with:
+
+1. **Timestamp**: When the execution occurred (UTC, timezone-aware)
+2. **Tool Name**: Which tool was executed
+3. **Persona**: The persona context
+4. **Arguments**: Full input arguments (JSON)
+5. **Status**: "SUCCESS" or "FAILURE"
+6. **Result Summary**: Output (truncated to ~2000 chars for success)
+7. **Error Traceback**: **Full Python traceback** with line numbers (for failures)
+
+### Database Schema
+
+```sql
+CREATE TABLE executionlog (
+    id INTEGER PRIMARY KEY,
+    timestamp DATETIME NOT NULL,
+    tool_name VARCHAR NOT NULL,
+    persona VARCHAR NOT NULL,
+    arguments JSON,
+    status VARCHAR NOT NULL,
+    result_summary VARCHAR NOT NULL,
+    error_traceback TEXT
+);
+```
+
+### The get_last_error Debug Tool
+
+A special tool is provided to query error details:
+
+**Tool Name:** `get_last_error`
+
+**Arguments:**
+- `tool_name` (optional string): Filter errors by specific tool name
+
+**Returns:** Formatted string containing:
+- Tool name
+- Timestamp
+- Persona
+- Input arguments
+- **Full Python traceback with exact line numbers**
+
+### Self-Healing Workflow
+
+```
+1. AI creates a new tool (e.g., fibonacci calculator)
+   ↓
+2. AI tests the tool → Generic error received
+   ↓
+3. AI calls get_last_error(tool_name='fibonacci')
+   ↓
+4. AI receives detailed traceback:
+   "Traceback (most recent call last):
+     File "runtime.py", line 361, in execute_tool
+       result = tool_instance.run(arguments)
+     File "<string>", line 7, in run
+   ZeroDivisionError: division by zero"
+   ↓
+5. AI analyzes the traceback:
+   - Error type: ZeroDivisionError
+   - Location: Line 7 in run() method
+   - Cause: Division by zero in the code
+   ↓
+6. AI patches the code in CodeVault
+   ↓
+7. AI tests again → Tool works!
+   ↓
+8. Execution log shows complete audit trail
+```
+
+### Usage Examples
+
+#### Get Most Recent Error (Any Tool)
+
+```python
+from sqlmodel import Session
+from models import get_engine
+from runtime import execute_tool
+
+engine = get_engine("sqlite:///chameleon.db")
+
+with Session(engine) as session:
+    error_info = execute_tool(
+        "get_last_error",
+        "default",
+        {},
+        session
+    )
+    print(error_info)
+```
+
+#### Get Most Recent Error for Specific Tool
+
+```python
+with Session(engine) as session:
+    error_info = execute_tool(
+        "get_last_error",
+        "default",
+        {"tool_name": "my_broken_tool"},
+        session
+    )
+    print(error_info)
+```
+
+#### Complete Self-Healing Example
+
+```python
+with Session(engine) as session:
+    # Try to run a tool
+    try:
+        result = execute_tool("calculate", "default", {"x": 10}, session)
+    except Exception as e:
+        print(f"Tool failed: {e}")
+        
+        # Get detailed error information
+        error_info = execute_tool(
+            "get_last_error",
+            "default",
+            {"tool_name": "calculate"},
+            session
+        )
+        
+        # error_info contains full traceback with line numbers
+        # AI can now analyze and fix the bug
+        print(error_info)
+```
+
+### Key Features
+
+#### Automatic Logging
+- Every tool execution is automatically logged
+- Zero changes required to existing tools
+- Works with both Python and SQL tools
+- Compatible with persona system
+
+#### Robust Error Capture
+- Full Python tracebacks using `traceback.format_exc()`
+- Exact line numbers and error types preserved
+- Original exceptions re-raised (no masking)
+- Logs persist even if main transaction fails
+
+#### Independent Persistence
+- Logs use independent commits
+- Persist even if main execution transaction fails
+- Never crashes the main execution
+- Critical for capturing failure information
+
+#### Security and Privacy
+- ✅ CodeQL security scan: 0 vulnerabilities
+- Independent transaction commits
+- Safe JSON serialization with error handling
+- Timezone-aware datetime handling
+
+**Note:** Execution logs may contain:
+- Sensitive input arguments
+- Internal code structure (from tracebacks)
+- Sensitive output data
+
+Implement appropriate access controls in production environments.
+
+### Performance Impact
+
+Minimal overhead:
+- Single INSERT per tool execution
+- Async-friendly (logs after execution completes)
+- Automatic result truncation (~2000 chars)
+- No impact on successful fast paths
+
+### Registering the Debug Tool
+
+The debug tool is automatically included when seeding the database:
+
+```bash
+python seed_db.py
+```
+
+Or register it separately:
+
+```bash
+python add_debug_tool.py
+```
+
+### Demo
+
+Run the interactive self-healing demonstration:
+
+```bash
+python demo_self_healing.py
+```
+
+This demonstrates:
+1. Creating a broken fibonacci tool
+2. Executing it and seeing it fail
+3. Using get_last_error to retrieve the traceback
+4. Analyzing the error
+5. Fixing the code
+6. Verifying the fix works
+7. Viewing the execution log history
+
+### Documentation
+
+For complete documentation, see:
+- [EXECUTION_LOG_README.md](EXECUTION_LOG_README.md) - Detailed usage guide
+- [IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md](IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md) - Technical implementation details
 
 ## Connecting AI Clients
 
