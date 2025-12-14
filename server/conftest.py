@@ -47,7 +47,8 @@ def db_engine():
     engine.dispose()
     try:
         os.unlink(temp_db.name)
-    except:
+    except OSError:
+        # File may already be deleted or locked
         pass
 
 

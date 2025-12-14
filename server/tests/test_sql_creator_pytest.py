@@ -13,7 +13,7 @@ import pytest
 from datetime import date
 from sqlmodel import select
 
-from add_sql_creator_tool import register_sql_creator_tool, _compute_hash
+from add_sql_creator_tool import register_sql_creator_tool
 from models import CodeVault, ToolRegistry, SalesPerDay
 from runtime import execute_tool, SecurityError
 
