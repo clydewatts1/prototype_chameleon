@@ -16,7 +16,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
-from add_resource_bridge import register_resource_bridge_tool, _compute_hash
+from add_resource_bridge import register_resource_bridge_tool
 from models import CodeVault, ToolRegistry, ResourceRegistry, get_engine, create_db_and_tables
 from runtime import execute_tool
 
