@@ -32,7 +32,7 @@ def add_reconnect_tool(metadata_database_url: str = None):
         metadata_database_url: Database connection string for metadata DB.
                               If None, loads from config.
     """
-    # Load configuration if database_url not provided
+    # Load configuration if metadata_database_url not provided
     if metadata_database_url is None:
         config = load_config()
         metadata_database_url = config.get('metadata_database', {}).get('url', 'sqlite:///chameleon_meta.db')
