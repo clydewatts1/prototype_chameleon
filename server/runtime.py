@@ -208,7 +208,7 @@ def execute_tool(
             validate_single_statement(rendered_sql)
             
             # Validate read-only (only SELECT statements allowed)
-            _validate_read_only(rendered_sql)
+            validate_read_only(rendered_sql)
             
             # Step 3: Safe execution with SQLAlchemy parameter binding
             # The rendered SQL should use :param_name syntax for values
@@ -433,7 +433,7 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, meta_session: Session, d
         validate_single_statement(rendered_sql)
         
         # Validate read-only (only SELECT statements allowed)
-        _validate_read_only(rendered_sql)
+        validate_read_only(rendered_sql)
         
         # Step 3: Safe execution with SQLAlchemy parameter binding
         # Pass template_args as params for safe binding (use data_session for business data)
