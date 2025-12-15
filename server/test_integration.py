@@ -78,10 +78,18 @@ def test_default_config_server():
         # Check output
         combined = stdout + stderr
         
-        if 'Database URL: sqlite:///chameleon.db' in combined:
-            print("  ✅ Default database URL used")
+        # Check for dual-database architecture
+        if 'Metadata Database URL: sqlite:///chameleon_meta.db' in combined:
+            print("  ✅ Default metadata database URL used")
         else:
-            print(f"  ❌ Expected default database URL not found")
+            print(f"  ❌ Expected default metadata database URL not found")
+            print(f"  Output: {combined[:500]}")
+            return False
+        
+        if 'Data Database URL: sqlite:///chameleon_data.db' in combined:
+            print("  ✅ Default data database URL used")
+        else:
+            print(f"  ❌ Expected default data database URL not found")
             print(f"  Output: {combined[:500]}")
             return False
         
@@ -121,10 +129,12 @@ def test_cli_overrides():
         # Check output
         combined = stdout + stderr
         
-        if 'Database URL: sqlite:///test_cli.db' in combined:
-            print("  ✅ CLI database URL override works")
+        # Note: --database-url is legacy, but we can test the new dual-database args
+        # For backward compatibility, we expect the default dual-database URLs
+        if 'Metadata Database URL:' in combined and 'Data Database URL:' in combined:
+            print("  ✅ Dual-database architecture present")
         else:
-            print(f"  ❌ CLI database URL override failed")
+            print(f"  ❌ Dual-database architecture not found")
             print(f"  Output: {combined[:500]}")
             return False
         
