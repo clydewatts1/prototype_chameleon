@@ -34,7 +34,7 @@ def add_debug_tool(database_url: str = None):
     # Load configuration if database_url not provided
     if database_url is None:
         config = load_config()
-        database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+        database_url = config.get('metadata_database', {}).get('url', 'sqlite:///chameleon.db')
     engine = get_engine(database_url)
     
     print("=" * 60)

@@ -354,7 +354,7 @@ def main():
         database_url = args.database
     else:
         config = load_config()
-        database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+        database_url = config.get('metadata_database', {}).get('url', 'sqlite:///data/chameleon_meta.db')
     
     # Load specifications
     success = load_specs_from_yaml(args.yaml_file, database_url, args.clean)
