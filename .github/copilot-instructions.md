@@ -273,12 +273,13 @@ result = execute_tool(
 
 ## Documentation Files
 
-When working on specific features, refer to:
+When working on specific features, refer to these documentation files in the repository:
 - `server/README.md` - Comprehensive server documentation
-- `server/SQL_CREATOR_TOOL_README.md` - SQL Creator meta-tool
-- `server/EXECUTION_LOG_README.md` - Execution logging and debugging
-- `PYTEST_MIGRATION.md` - Testing guide
-- `DATABASE_CONFIG_VALIDATION.md` - Database configuration
+- `server/SQL_CREATOR_TOOL_README.md` - SQL Creator meta-tool guide
+- `server/EXECUTION_LOG_README.md` - Execution logging and debugging guide
+- `server/DYNAMIC_META_TOOLS_README.md` - Dynamic meta-tools documentation
+- `PYTEST_MIGRATION.md` (root) - Testing migration guide
+- `DATABASE_CONFIG_VALIDATION.md` (root) - Database configuration validation
 - `client/README.md` - Client documentation
 
 ## Development Workflow
