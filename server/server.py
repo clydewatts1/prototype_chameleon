@@ -5,6 +5,11 @@ This module implements a dynamic MCP server that lists and executes tools
 based on persona stored in the database.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
 import argparse
 import asyncio
 import logging

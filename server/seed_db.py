@@ -4,24 +4,18 @@ Database seeder script for inserting sample tools.
 This script populates the database with sample tools for testing the MCP server.
 """
 
-import hashlib
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
+from common.utils import compute_hash
 from datetime import date, timedelta
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
 from config import load_config
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def _clear_metadata_database(session: Session) -> None:
@@ -106,7 +100,7 @@ class GreetingTool(ChameleonTool):
         self.log(f"Greeting {name}")
         return f'Hello {name}! I am running from the database.'
 """
-        greeting_hash = _compute_hash(greeting_code)
+        greeting_hash = compute_hash(greeting_code)
         
         print("\n[1] Adding greeting tool...")
         greeting_vault = CodeVault(
@@ -145,7 +139,7 @@ class AddTool(ChameleonTool):
         self.log(f"Adding {a} + {b}")
         return a + b
 """
-        add_hash = _compute_hash(add_code)
+        add_hash = compute_hash(add_code)
         
         print("\n[2] Adding calculator (add) tool...")
         add_vault = CodeVault(
@@ -188,7 +182,7 @@ class MultiplyTool(ChameleonTool):
         self.log(f"Multiplying {a} * {b}")
         return a * b
 """
-        multiply_hash = _compute_hash(multiply_code)
+        multiply_hash = compute_hash(multiply_code)
         
         print("\n[3] Adding calculator (multiply) tool for assistant persona...")
         multiply_vault = CodeVault(
@@ -230,7 +224,7 @@ class UppercaseTool(ChameleonTool):
         self.log(f"Converting to uppercase: {text}")
         return text.upper()
 """
-        uppercase_hash = _compute_hash(uppercase_code)
+        uppercase_hash = compute_hash(uppercase_code)
         
         print("\n[4] Adding uppercase tool...")
         uppercase_vault = CodeVault(
@@ -304,7 +298,7 @@ class ServerTimeTool(ChameleonTool):
         self.log("Getting current server time")
         return f"Current server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 """
-        server_time_hash = _compute_hash(server_time_code)
+        server_time_hash = compute_hash(server_time_code)
         
         server_time_vault = CodeVault(
             hash=server_time_hash,
@@ -343,7 +337,7 @@ WHERE 1=1
 {% endif %}
 GROUP BY store_name, department
 ORDER BY total_sales DESC"""
-        sales_query_hash = _compute_hash(sales_query_code)
+        sales_query_hash = compute_hash(sales_query_code)
         
         sales_query_vault = CodeVault(
             hash=sales_query_hash,
@@ -385,7 +379,7 @@ FROM sales_per_day
 GROUP BY business_date, store_name
 ORDER BY business_date DESC
 LIMIT 10"""
-        sales_report_hash = _compute_hash(sales_report_code)
+        sales_report_hash = compute_hash(sales_report_code)
         
         sales_report_vault = CodeVault(
             hash=sales_report_hash,
@@ -426,7 +420,7 @@ WHERE 1=1
 {% endif %}
 GROUP BY department
 ORDER BY total_sales DESC"""
-        sales_by_category_hash = _compute_hash(sales_by_category_code)
+        sales_by_category_hash = compute_hash(sales_by_category_code)
         
         sales_by_category_vault = CodeVault(
             hash=sales_by_category_hash,
@@ -502,7 +496,7 @@ class GetLastErrorTool(ChameleonTool):
         
         return "\\n".join(output)
 """
-        get_last_error_hash = _compute_hash(get_last_error_code)
+        get_last_error_hash = compute_hash(get_last_error_code)
         
         get_last_error_vault = CodeVault(
             hash=get_last_error_hash,

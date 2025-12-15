@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 """
 Script to add the get_last_error debugging tool to the database.
 
@@ -5,23 +9,12 @@ This tool enables AI self-debugging by querying the ExecutionLog table
 for detailed error information including full Python tracebacks.
 """
 
-import hashlib
+from common.utils import compute_hash
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, get_engine
 from config import load_config
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def add_debug_tool(database_url: str = None):
@@ -42,47 +35,14 @@ def add_debug_tool(database_url: str = None):
     print("=" * 60)
     
     with Session(engine) as session:
-        # Define the get_last_error tool code
-        get_last_error_code = """from base import ChameleonTool
-from sqlmodel import select
-from models import ExecutionLog
-
-class GetLastErrorTool(ChameleonTool):
-    def run(self, arguments):
-        tool_name = arguments.get('tool_name')
+        # Load the tool code from file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        tool_code_path = os.path.join(script_dir, '..', 'tools', 'system', 'debug_tool.py')
+        with open(tool_code_path, 'r') as f:
+            get_last_error_code = f.read()
         
-        # Build query for last error
-        query = select(ExecutionLog).where(ExecutionLog.status == 'FAILURE')
         
-        # Optional filter by tool_name
-        if tool_name:
-            query = query.where(ExecutionLog.tool_name == tool_name)
-        
-        # Order by timestamp descending and get the most recent
-        query = query.order_by(ExecutionLog.timestamp.desc()).limit(1)
-        
-        # Execute query
-        result = self.db_session.exec(query).first()
-        
-        if not result:
-            if tool_name:
-                return f"No errors found for tool '{tool_name}'"
-            else:
-                return "No errors found in execution log"
-        
-        # Format the result
-        output = []
-        output.append(f"Last error for tool '{result.tool_name}':")
-        output.append(f"Time: {result.timestamp}")
-        output.append(f"Persona: {result.persona}")
-        output.append(f"Input: {result.arguments}")
-        output.append(f"\\nTraceback:")
-        output.append(result.error_traceback or "No traceback available")
-        
-        return "\\n".join(output)
-"""
-        
-        get_last_error_hash = _compute_hash(get_last_error_code)
+        get_last_error_hash = compute_hash(get_last_error_code)
         
         print("\n[1] Adding get_last_error tool code to CodeVault...")
         

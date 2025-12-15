@@ -7,7 +7,13 @@ This module provides shared fixtures for database setup and teardown.
 import pytest
 import tempfile
 import os
+import sys
 from sqlmodel import Session, create_engine
+
+# Add server directory to Python path so server modules can import each other
+server_path = os.path.join(os.path.dirname(__file__), '..', 'server')
+sys.path.insert(0, os.path.abspath(server_path))
+
 from models import create_db_and_tables
 
 
