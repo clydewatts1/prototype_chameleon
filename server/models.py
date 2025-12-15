@@ -195,11 +195,23 @@ def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
     return engine
 
 
-def create_db_and_tables(engine):
+# Model classification for dual-engine architecture
+METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog]
+DATA_MODELS = [SalesPerDay]
+
+
+def create_db_and_tables(engine, models=None):
     """
-    Create all database tables.
+    Create database tables for specified models.
     
     Args:
         engine: SQLModel engine instance
+        models: List of model classes to create. If None, creates all tables.
     """
-    SQLModel.metadata.create_all(engine)
+    if models is None:
+        # Create all tables (backward compatibility)
+        SQLModel.metadata.create_all(engine)
+    else:
+        # Create only specified model tables
+        tables = [model.__table__ for model in models]
+        SQLModel.metadata.create_all(engine, tables=tables)

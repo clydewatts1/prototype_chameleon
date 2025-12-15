@@ -7,7 +7,7 @@ This script populates the database with sample tools for testing the MCP server.
 import hashlib
 from datetime import date, timedelta
 from sqlmodel import Session, select
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
 from config import load_config
 
 
@@ -24,50 +24,78 @@ def _compute_hash(code: str) -> str:
     return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
-def _clear_database(session: Session) -> None:
+def _clear_metadata_database(session: Session) -> None:
     """
-    Clear all existing data from the database.
+    Clear all existing metadata from the database.
     
     Args:
-        session: SQLModel session
+        session: SQLModel session for metadata database
     """
     # Delete in order of dependencies
     session.exec(ToolRegistry.__table__.delete())
     session.exec(ResourceRegistry.__table__.delete())
     session.exec(PromptRegistry.__table__.delete())
     session.exec(CodeVault.__table__.delete())
+    session.commit()
+
+
+def _clear_data_database(session: Session) -> None:
+    """
+    Clear all existing data from the data database.
+    
+    Args:
+        session: SQLModel session for data database
+    """
+    # Delete in order of dependencies
     session.exec(SalesPerDay.__table__.delete())
     session.commit()
 
 
-def seed_database(database_url: str = None, clear_existing: bool = True):
+def seed_database(metadata_database_url: str = None, data_database_url: str = None, clear_existing: bool = True):
     """
-    Seed the database with sample tools.
+    Seed the databases with sample tools and data.
     
     Args:
-        database_url: Database connection string. If None, loads from config.
+        metadata_database_url: Metadata database connection string. If None, loads from config.
+        data_database_url: Data database connection string. If None, loads from config.
         clear_existing: If True, clear existing data before seeding
     """
-    # Load configuration if database_url not provided
-    if database_url is None:
-        config = load_config()
-        database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
-    # Create engine and tables
-    engine = get_engine(database_url)
-    create_db_and_tables(engine)
+    # Load configuration if URLs not provided
+    config = load_config()
+    if metadata_database_url is None:
+        metadata_database_url = config.get('metadata_database', {}).get('url', 'sqlite:///chameleon_meta.db')
+    if data_database_url is None:
+        data_database_url = config.get('data_database', {}).get('url', 'sqlite:///chameleon_data.db')
+    
+    # Create engines and tables
+    meta_engine = get_engine(metadata_database_url)
+    create_db_and_tables(meta_engine, METADATA_MODELS)
+    
+    # Try to create data engine, but allow failure
+    data_engine = None
+    try:
+        data_engine = get_engine(data_database_url)
+        create_db_and_tables(data_engine, DATA_MODELS)
+    except Exception as e:
+        print(f"⚠️  Warning: Could not connect to data database: {e}")
+        print("⚠️  Continuing with metadata seeding only...")
     
     print("=" * 60)
-    print("Seeding Database with Sample Tools")
+    print("Seeding Databases with Sample Tools and Data")
+    print("=" * 60)
+    print(f"Metadata DB: {metadata_database_url}")
+    print(f"Data DB: {data_database_url}")
     print("=" * 60)
     
-    with Session(engine) as session:
+    # Seed metadata database
+    with Session(meta_engine) as session:
         # Clear existing data if requested
         if clear_existing:
             existing_tools = session.exec(select(ToolRegistry)).first()
             if existing_tools:
-                print("\n⚠️  Clearing existing data...")
-                _clear_database(session)
-                print("✅ Database cleared")
+                print("\n⚠️  Clearing existing metadata...")
+                _clear_metadata_database(session)
+                print("✅ Metadata cleared")
         
         # Sample Tool 1: Greeting function
         greeting_code = """from base import ChameleonTool
@@ -298,23 +326,6 @@ class ServerTimeTool(ChameleonTool):
         session.add(server_time_resource)
         print(f"   ✅ Resource 'server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
         
-        # Sample Data: sales_per_day table
-        print("\n[8] Populating sales_per_day table with sample data...")
-        stores = ["Store A", "Store B", "Store C", "Store D"]
-        departments = ["Electronics", "Clothing", "Groceries", "Home & Garden", "Sports"]
-        
-        # Create 20 rows of sales data
-        base_date = date(2024, 1, 1)
-        for i in range(20):
-            sales_record = SalesPerDay(
-                business_date=base_date + timedelta(days=i),
-                store_name=stores[i % len(stores)],
-                department=departments[i % len(departments)],
-                sales_amount=round(1000 + (i * 150.75) + ((i % 3) * 500), 2)
-            )
-            session.add(sales_record)
-        print(f"   ✅ Added 20 rows to sales_per_day table")
-        
         # Sample Tool using SELECT code_type with Jinja2 + SQLAlchemy binding
         print("\n[9] Adding 'get_sales_summary' tool with SELECT code_type (hybrid approach)...")
         sales_query_code = """SELECT 
@@ -519,41 +530,88 @@ class GetLastErrorTool(ChameleonTool):
         session.add(get_last_error_tool)
         print(f"   ✅ Tool 'get_last_error' added (hash: {get_last_error_hash[:16]}...)")
         
-        # Commit all changes
+        # Commit all metadata changes
         session.commit()
         
         print("\n" + "=" * 60)
-        print("Database seeding completed successfully!")
+        print("Metadata Database Seeding Completed!")
         print("=" * 60)
+    
+    # Seed data database (if available)
+    if data_engine is not None:
+        with Session(data_engine) as data_session:
+            # Clear existing data if requested
+            if clear_existing:
+                existing_sales = data_session.exec(select(SalesPerDay)).first()
+                if existing_sales:
+                    print("\n⚠️  Clearing existing data...")
+                    _clear_data_database(data_session)
+                    print("✅ Data cleared")
+            
+            # Sample Data: sales_per_day table
+            print("\n[8] Populating sales_per_day table with sample data...")
+            stores = ["Store A", "Store B", "Store C", "Store D"]
+            departments = ["Electronics", "Clothing", "Groceries", "Home & Garden", "Sports"]
+            
+            # Create 20 rows of sales data
+            base_date = date(2024, 1, 1)
+            for i in range(20):
+                sales_record = SalesPerDay(
+                    business_date=base_date + timedelta(days=i),
+                    store_name=stores[i % len(stores)],
+                    department=departments[i % len(departments)],
+                    sales_amount=round(1000 + (i * 150.75) + ((i % 3) * 500), 2)
+                )
+                data_session.add(sales_record)
+            data_session.commit()
+            print(f"   ✅ Added 20 rows to sales_per_day table")
         
-        # Show summary
-        print("\nTools added:")
-        print("  - greet (persona: default)")
-        print("  - add (persona: default)")
-        print("  - multiply (persona: assistant)")
-        print("  - uppercase (persona: default)")
-        print("  - get_sales_summary (persona: default, code_type: select, with filtering)")
-        print("  - get_sales_by_category (persona: default, code_type: select, with date filtering)")
-        print("  - get_last_error (persona: default, debugging tool for AI self-healing)")
-        print("\nResources added:")
-        print("  - welcome_message (static, URI: memo://welcome)")
-        print("  - server_time (dynamic, URI: system://time, code_type: python)")
-        print("  - sales_report (dynamic, URI: data://sales/recent, code_type: select)")
-        print("\nPrompts added:")
-        print("  - review_code")
-        print("\nSample Data:")
+        print("\n" + "=" * 60)
+        print("Data Database Seeding Completed!")
+        print("=" * 60)
+    else:
+        print("\n⚠️  Data database not available - skipping data seeding")
+    
+    print("\n" + "=" * 60)
+    print("All Database Seeding Completed Successfully!")
+    print("=" * 60)
+    
+    # Show summary
+    print("\nTools added:")
+    print("  - greet (persona: default)")
+    print("  - add (persona: default)")
+    print("  - multiply (persona: assistant)")
+    print("  - uppercase (persona: default)")
+    print("  - get_sales_summary (persona: default, code_type: select, with filtering)")
+    print("  - get_sales_by_category (persona: default, code_type: select, with date filtering)")
+    print("  - get_last_error (persona: default, debugging tool for AI self-healing)")
+    print("\nResources added:")
+    print("  - welcome_message (static, URI: memo://welcome)")
+    print("  - server_time (dynamic, URI: system://time, code_type: python)")
+    print("  - sales_report (dynamic, URI: data://sales/recent, code_type: select)")
+    print("\nPrompts added:")
+    print("  - review_code")
+    print("\nSample Data:")
+    if data_engine is not None:
         print("  - sales_per_day table: 20 rows")
-        print("\n🔒 Security Features:")
-        print("  - Jinja2 templates for SQL structure (optional WHERE clauses)")
-        print("  - SQLAlchemy parameter binding (:param) for all values")
-        print("  - Single statement validation (prevents SQL injection)")
-        print("  - Read-only validation (only SELECT allowed)")
-        print("\n🔧 AI Self-Debugging Features:")
-        print("  - ExecutionLog table captures all tool executions")
-        print("  - Full Python tracebacks logged for failures")
-        print("  - get_last_error tool provides detailed error diagnostics")
-        print("  - Enables AI self-healing workflow")
-        print("\nYou can now run the MCP server with: python server.py")
+    else:
+        print("  - sales_per_day table: NOT SEEDED (data database unavailable)")
+    print("\n🔒 Security Features:")
+    print("  - Jinja2 templates for SQL structure (optional WHERE clauses)")
+    print("  - SQLAlchemy parameter binding (:param) for all values")
+    print("  - Single statement validation (prevents SQL injection)")
+    print("  - Read-only validation (only SELECT allowed)")
+    print("\n🔧 AI Self-Debugging Features:")
+    print("  - ExecutionLog table captures all tool executions")
+    print("  - Full Python tracebacks logged for failures")
+    print("  - get_last_error tool provides detailed error diagnostics")
+    print("  - Enables AI self-healing workflow")
+    print("\n🔄 Dual-Engine Architecture:")
+    print("  - Metadata DB: System tools, logs, resources, prompts")
+    print("  - Data DB: Business data (sales, inventory, etc.)")
+    print("  - Server can start even if Data DB is offline")
+    print("  - Use 'reconnect_db' tool to reconnect at runtime")
+    print("\nYou can now run the MCP server with: python server.py")
 
 
 if __name__ == "__main__":
