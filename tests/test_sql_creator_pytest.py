@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
+
 from common.utils import compute_hash as _compute_hash
 """
 Pytest test suite for the SQL Creator Meta-Tool.
@@ -14,9 +18,9 @@ import pytest
 from datetime import date
 from sqlmodel import select
 
-from server.add_sql_creator_tool import register_sql_creator_tool
-from server.models import CodeVault, ToolRegistry, SalesPerDay
-from server.runtime import execute_tool, ToolNotFoundError
+from add_sql_creator_tool import register_sql_creator_tool
+from models import CodeVault, ToolRegistry, SalesPerDay
+from runtime import execute_tool, ToolNotFoundError
 from common.security import SecurityError
 
 

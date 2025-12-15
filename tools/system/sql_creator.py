@@ -1,5 +1,3 @@
-"""SQL Creator Meta-Tool for dynamically creating SQL-based tools."""
-
 from base import ChameleonTool
 from sqlmodel import select
 import hashlib

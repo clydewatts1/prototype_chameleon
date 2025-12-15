@@ -1,5 +1,3 @@
-"""Resource Bridge Tool - allows clients to read resources via the Tools interface."""
-
 from base import ChameleonTool
 from runtime import get_resource, ResourceNotFoundError
 from sqlmodel import select

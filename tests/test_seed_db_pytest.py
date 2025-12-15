@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
+
 from common.utils import compute_hash as _compute_hash
 """
 Pytest test suite for seed_db.py to validate database seeding.
@@ -5,8 +9,8 @@ Pytest test suite for seed_db.py to validate database seeding.
 
 import pytest
 from sqlmodel import Session, select
-from server.models import ToolRegistry, ResourceRegistry, PromptRegistry, CodeVault
-from server.seed_db import seed_database
+from models import ToolRegistry, ResourceRegistry, PromptRegistry, CodeVault
+from seed_db import seed_database
 
 
 @pytest.mark.integration

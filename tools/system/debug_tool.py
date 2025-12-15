@@ -1,5 +1,3 @@
-"""Debug Tool - retrieves execution errors from the ExecutionLog."""
-
 from base import ChameleonTool
 from sqlmodel import select
 from models import ExecutionLog

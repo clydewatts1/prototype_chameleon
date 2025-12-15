@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
+
 from common.utils import compute_hash as _compute_hash
 """
 Pytest test suite for runtime.py security features with Jinja2 + SQLAlchemy binding.
@@ -13,8 +17,8 @@ import pytest
 import hashlib
 from datetime import date, timedelta
 from sqlmodel import select
-from server.models import CodeVault, ToolRegistry, SalesPerDay
-from server.runtime import execute_tool, ToolNotFoundError
+from models import CodeVault, ToolRegistry, SalesPerDay
+from runtime import execute_tool, ToolNotFoundError
 from common.security import SecurityError
 
 
