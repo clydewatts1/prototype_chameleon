@@ -10,7 +10,7 @@ Usage:
     python add_db_test_tool.py
 """
 
-import hashlib
+from common.utils import compute_hash
 import sys
 from sqlmodel import Session, select
 
@@ -18,17 +18,6 @@ from config import load_config
 from models import CodeVault, ToolRegistry, get_engine, create_db_and_tables
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def register_db_test_tool(database_url: str = None):
@@ -134,7 +123,7 @@ class ConnectionTestTool(ChameleonTool):
         return '\\n'.join(output_lines)
 """
     
-    tool_hash = _compute_hash(tool_code)
+    tool_hash = compute_hash(tool_code)
     
     try:
         with Session(engine) as session:

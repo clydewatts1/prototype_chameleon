@@ -10,7 +10,7 @@ Usage:
     python add_dynamic_meta_tools.py
 """
 
-import hashlib
+from common.utils import compute_hash
 import sys
 from sqlmodel import Session, select
 
@@ -18,17 +18,6 @@ from config import load_config
 from models import CodeVault, ToolRegistry, get_engine, create_db_and_tables
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def register_prompt_creator_tool(database_url: str = None):
@@ -58,7 +47,7 @@ def register_prompt_creator_tool(database_url: str = None):
     # Define the meta-tool code blob
     tool_code = """from base import ChameleonTool
 from sqlmodel import select
-import hashlib
+from common.utils import compute_hash
 import json
 
 class PromptCreatorTool(ChameleonTool):
@@ -139,7 +128,7 @@ class PromptCreatorTool(ChameleonTool):
             return f"Error: Failed to register prompt - {type(e).__name__}: {str(e)}"
 """
     
-    tool_hash = _compute_hash(tool_code)
+    tool_hash = compute_hash(tool_code)
     
     try:
         with Session(engine) as session:
@@ -250,7 +239,7 @@ def register_resource_creator_tool(database_url: str = None):
     # Define the meta-tool code blob
     tool_code = """from base import ChameleonTool
 from sqlmodel import select
-import hashlib
+from common.utils import compute_hash
 import json
 
 class ResourceCreatorTool(ChameleonTool):
@@ -334,7 +323,7 @@ class ResourceCreatorTool(ChameleonTool):
             return f"Error: Failed to register resource - {type(e).__name__}: {str(e)}"
 """
     
-    tool_hash = _compute_hash(tool_code)
+    tool_hash = compute_hash(tool_code)
     
     try:
         with Session(engine) as session:

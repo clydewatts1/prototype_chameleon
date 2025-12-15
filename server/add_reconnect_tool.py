@@ -5,23 +5,12 @@ This tool allows the server to attempt reconnection to the data database if it w
 unavailable or disconnected.
 """
 
-import hashlib
+from common.utils import compute_hash
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, get_engine, create_db_and_tables, METADATA_MODELS
 from config import load_config
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def add_reconnect_tool(metadata_database_url: str = None):
@@ -86,7 +75,7 @@ class ReconnectDbTool(ChameleonTool):
             logging.error(f"Failed to reconnect to data database: {e}")
             return f"Failed to reconnect to business database: {str(e)}"
 """
-        reconnect_hash = _compute_hash(reconnect_code)
+        reconnect_hash = compute_hash(reconnect_code)
         
         # Check if tool already exists
         existing_vault = session.exec(

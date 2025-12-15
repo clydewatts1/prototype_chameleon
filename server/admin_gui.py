@@ -6,13 +6,13 @@ and personas in the Chameleon MCP server database.
 """
 
 import os
-import hashlib
 import json
 import streamlit as st
 from sqlalchemy import func
 from sqlmodel import Session, select, create_engine
 from config import load_config
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine
+from common.utils import compute_hash
 
 
 # Database connection setup
@@ -37,19 +37,6 @@ def get_db_engine():
         db_url = config['database']['url']
     
     return get_engine(db_url)
-
-
-def compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 # Dashboard Page

@@ -5,23 +5,12 @@ This tool enables AI self-debugging by querying the ExecutionLog table
 for detailed error information including full Python tracebacks.
 """
 
-import hashlib
+from common.utils import compute_hash
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, get_engine
 from config import load_config
 
 
-def _compute_hash(code: str) -> str:
-    """
-    Compute SHA-256 hash of code.
-    
-    Args:
-        code: The code string to hash
-        
-    Returns:
-        SHA-256 hash as hexadecimal string
-    """
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 def add_debug_tool(database_url: str = None):
@@ -82,7 +71,7 @@ class GetLastErrorTool(ChameleonTool):
         return "\\n".join(output)
 """
         
-        get_last_error_hash = _compute_hash(get_last_error_code)
+        get_last_error_hash = compute_hash(get_last_error_code)
         
         print("\n[1] Adding get_last_error tool code to CodeVault...")
         
