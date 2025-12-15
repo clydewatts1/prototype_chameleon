@@ -29,7 +29,7 @@ from mcp.types import (
 from sqlmodel import Session, select
 
 from config import load_config
-from models import get_engine, create_db_and_tables, ToolRegistry
+from models import get_engine, create_db_and_tables, ToolRegistry, METADATA_MODELS, DATA_MODELS
 from runtime import (
     execute_tool, 
     list_tools_for_persona, 
@@ -48,10 +48,15 @@ from seed_db import seed_database
 # Initialize the server
 app = Server('chameleon-engine')
 
-# Database engine - initialized in lifespan
-_db_engine = None
-# Database URL - set in lifespan from config
+# Database engines - initialized in lifespan
+_db_engine = None  # Legacy single engine (for backward compatibility)
+_meta_engine = None  # Metadata engine
+_data_engine = None  # Data engine
+_data_db_connected = False  # Flag indicating if data DB is available
+# Database URLs - set in lifespan from config
 _database_url = None
+_metadata_database_url = None
+_data_database_url = None
 
 
 def setup_logging(log_level: str = "INFO", logs_dir: str = "logs"):
@@ -124,35 +129,84 @@ def setup_logging(log_level: str = "INFO", logs_dir: str = "logs"):
 
 
 def get_db_engine():
-    """Get the database engine instance."""
-    if _db_engine is None:
+    """Get the database engine instance (legacy - returns metadata engine)."""
+    if _meta_engine is None and _db_engine is None:
         raise RuntimeError("Database not initialized. Server lifespan not started.")
-    return _db_engine
+    return _meta_engine if _meta_engine is not None else _db_engine
+
+
+def get_meta_engine():
+    """Get the metadata database engine instance."""
+    if _meta_engine is None:
+        raise RuntimeError("Metadata database not initialized. Server lifespan not started.")
+    return _meta_engine
+
+
+def get_data_engine():
+    """Get the data database engine instance. Returns None if not connected."""
+    return _data_engine
+
+
+def is_data_db_connected():
+    """Check if data database is connected."""
+    return _data_db_connected
 
 
 @asynccontextmanager
 async def lifespan(server_instance):
     """Initialize database on server startup."""
-    global _db_engine, _database_url
+    global _db_engine, _meta_engine, _data_engine, _data_db_connected
+    global _database_url, _metadata_database_url, _data_database_url
     
-    # _database_url should already be set by main() before app.run() is called
-    if _database_url is None:
-        # Fallback to default if not set
+    # Load URLs from config if not already set by main()
+    if _metadata_database_url is None or _data_database_url is None:
         from config import get_default_config
-        _database_url = get_default_config()['database']['url']
+        default_config = get_default_config()
+        if _metadata_database_url is None:
+            _metadata_database_url = default_config['metadata_database']['url']
+        if _data_database_url is None:
+            _data_database_url = default_config['data_database']['url']
     
-    # Setup database
-    _db_engine = get_engine(_database_url)
-    create_db_and_tables(_db_engine)
-    logging.info(f"Database initialized at {_database_url}")
+    # Setup metadata database (critical - must succeed)
+    logging.info("Initializing metadata database...")
+    _meta_engine = get_engine(_metadata_database_url)
+    create_db_and_tables(_meta_engine, METADATA_MODELS)
+    logging.info(f"Metadata database initialized at {_metadata_database_url}")
+    
+    # Setup data database (non-critical - allow failure for offline mode)
+    logging.info("Initializing data database...")
+    try:
+        _data_engine = get_engine(_data_database_url)
+        create_db_and_tables(_data_engine, DATA_MODELS)
+        _data_db_connected = True
+        logging.info(f"Data database initialized at {_data_database_url}")
+    except Exception as e:
+        _data_engine = None
+        _data_db_connected = False
+        logging.warning(f"Data database connection failed: {e}")
+        logging.warning("Server running in OFFLINE MODE - business data queries will be unavailable")
+        logging.warning("Use 'reconnect_db' tool to reconnect at runtime")
+    
+    # Set legacy _db_engine for backward compatibility
+    _db_engine = _meta_engine
+    _database_url = _metadata_database_url
+    
+    # Store engines on app instance for access by tools
+    app._meta_engine = _meta_engine
+    app._data_engine = _data_engine
+    app._data_db_connected = _data_db_connected
     
     # Auto-seed database if empty
-    with Session(_db_engine) as session:
+    with Session(_meta_engine) as session:
         existing_tools = session.exec(select(ToolRegistry)).first()
         if not existing_tools:
             # Database is empty, seed it with sample data
-            logging.info("Database is empty, seeding with sample data...")
-            seed_database(database_url=_database_url, clear_existing=False)
+            logging.info("Metadata database is empty, seeding with sample data...")
+            seed_database(
+                metadata_database_url=_metadata_database_url,
+                data_database_url=_data_database_url,
+                clear_existing=False
+            )
             logging.info("Database seeding completed")
     
     yield
@@ -241,10 +295,17 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
     logging.info(f"Calling tool '{name}' for persona '{persona}' with arguments: {arguments}")
     
     try:
-        # Execute the tool
-        engine = get_db_engine()
-        with Session(engine) as session:
-            result = execute_tool(name, persona, arguments, session)
+        # Execute the tool with dual sessions
+        meta_engine = get_meta_engine()
+        data_engine = get_data_engine()
+        
+        with Session(meta_engine) as meta_session:
+            # Create data_session only if data_engine is available
+            if data_engine is not None:
+                with Session(data_engine) as data_session:
+                    result = execute_tool(name, persona, arguments, meta_session, data_session)
+            else:
+                result = execute_tool(name, persona, arguments, meta_session, None)
         
         # Convert result to string if it's not already
         if result is None:
@@ -324,10 +385,17 @@ async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
     logging.info(f"Reading resource '{uri}' for persona '{persona}'")
     
     try:
-        # Get the resource content
-        engine = get_db_engine()
-        with Session(engine) as session:
-            content = get_resource(uri, persona, session)
+        # Get the resource content with dual sessions
+        meta_engine = get_meta_engine()
+        data_engine = get_data_engine()
+        
+        with Session(meta_engine) as meta_session:
+            # Create data_session only if data_engine is available
+            if data_engine is not None:
+                with Session(data_engine) as data_session:
+                    content = get_resource(uri, persona, meta_session, data_session)
+            else:
+                content = get_resource(uri, persona, meta_session, None)
         
         logging.info(f"Resource '{uri}' read successfully")
         # Return as list of ReadResourceContents
@@ -450,7 +518,7 @@ async def handle_get_prompt(name: str, arguments: dict[str, str] | None) -> GetP
 
 async def main():
     """Main entry point for the MCP server."""
-    global _database_url
+    global _database_url, _metadata_database_url, _data_database_url
     
     # Load configuration from YAML file
     config = load_config()
@@ -487,8 +555,18 @@ async def main():
     )
     parser.add_argument(
         '--database-url',
-        default=config['database']['url'],
-        help='Database URL (default: from config or sqlite:///chameleon.db)'
+        default=config.get('database', {}).get('url', 'sqlite:///chameleon.db'),
+        help='Database URL (legacy single database, default: from config or sqlite:///chameleon.db)'
+    )
+    parser.add_argument(
+        '--metadata-database-url',
+        default=config['metadata_database']['url'],
+        help='Metadata Database URL (default: from config or sqlite:///chameleon_meta.db)'
+    )
+    parser.add_argument(
+        '--data-database-url',
+        default=config['data_database']['url'],
+        help='Data Database URL (default: from config or sqlite:///chameleon_data.db)'
     )
     
     args = parser.parse_args()
@@ -497,11 +575,14 @@ async def main():
     setup_logging(args.log_level, args.logs_dir)
     logging.info("Server starting up...")
     logging.info(f"Transport: {args.transport}")
-    logging.info(f"Database URL: {args.database_url}")
+    logging.info(f"Metadata Database URL: {args.metadata_database_url}")
+    logging.info(f"Data Database URL: {args.data_database_url}")
     logging.info(f"Logs directory: {args.logs_dir}")
     
-    # Set database URL for lifespan handler
-    _database_url = args.database_url
+    # Set database URLs for lifespan handler
+    _database_url = args.database_url  # Legacy
+    _metadata_database_url = args.metadata_database_url
+    _data_database_url = args.data_database_url
     
     # Run with appropriate transport
     if args.transport == 'stdio':

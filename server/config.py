@@ -29,6 +29,14 @@ def get_default_config() -> Dict[str, Any]:
             'url': 'sqlite:///chameleon.db',
             'schema': None
         },
+        'metadata_database': {
+            'url': 'sqlite:///chameleon_meta.db',
+            'schema': None
+        },
+        'data_database': {
+            'url': 'sqlite:///chameleon_data.db',
+            'schema': None
+        },
         'tables': {
             'code_vault': 'codevault',
             'tool_registry': 'toolregistry',
@@ -73,9 +81,17 @@ def load_config() -> Dict[str, Any]:
             if 'server' in yaml_config:
                 config['server'].update(yaml_config['server'])
             
-            # Update database settings
+            # Update database settings (legacy single database)
             if 'database' in yaml_config:
                 config['database'].update(yaml_config['database'])
+            
+            # Update metadata_database settings
+            if 'metadata_database' in yaml_config:
+                config['metadata_database'].update(yaml_config['metadata_database'])
+            
+            # Update data_database settings
+            if 'data_database' in yaml_config:
+                config['data_database'].update(yaml_config['data_database'])
             
             # Update table settings
             if 'tables' in yaml_config:

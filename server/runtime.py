@@ -244,23 +244,25 @@ def execute_tool(
     tool_name: str,
     persona: str,
     arguments: Dict[str, Any],
-    db_session: Session
+    meta_session: Session,
+    data_session: Session = None
 ) -> Any:
     """
     Execute a tool by fetching and running its code from the database.
     
     This function:
-    1. Queries ToolRegistry for the tool
-    2. Fetches CodeVault content using the hash
+    1. Queries ToolRegistry for the tool (from metadata DB)
+    2. Fetches CodeVault content using the hash (from metadata DB)
     3. Re-hashes the content for security validation
     4. Executes the code in a sandboxed environment
-    5. Logs execution (SUCCESS or FAILURE) to ExecutionLog
+    5. Logs execution (SUCCESS or FAILURE) to ExecutionLog (in metadata DB)
     
     Args:
         tool_name: Name of the tool to execute
         persona: The persona/context for which to execute the tool
         arguments: Dictionary of arguments to pass to the tool
-        db_session: SQLModel Session for database access
+        meta_session: SQLModel Session for metadata database access
+        data_session: SQLModel Session for data database access (optional, may be None)
         
     Returns:
         The result of the tool execution
@@ -268,23 +270,24 @@ def execute_tool(
     Raises:
         ToolNotFoundError: If the tool is not found in the registry
         SecurityError: If hash validation fails
+        RuntimeError: If data database is required but not available
     """
     try:
-        # Query ToolRegistry for the tool
+        # Query ToolRegistry for the tool (from metadata DB)
         statement = select(ToolRegistry).where(
             ToolRegistry.tool_name == tool_name,
             ToolRegistry.target_persona == persona
         )
-        tool = db_session.exec(statement).first()
+        tool = meta_session.exec(statement).first()
         
         if not tool:
             raise ToolNotFoundError(
                 f"Tool '{tool_name}' not found for persona '{persona}'"
             )
         
-        # Fetch CodeVault content using the hash
+        # Fetch CodeVault content using the hash (from metadata DB)
         statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
-        code_vault = db_session.exec(statement).first()
+        code_vault = meta_session.exec(statement).first()
         
         if not code_vault:
             raise ToolNotFoundError(
@@ -301,6 +304,12 @@ def execute_tool(
         
         # Execute based on code type
         if code_vault.code_type == 'select':
+            # Check if data_session is available
+            if data_session is None:
+                raise RuntimeError(
+                    "Business database is currently offline. Use 'reconnect_db' tool to try again."
+                )
+            
             # Step 1: Render SQL template with Jinja2 for structural logic
             # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
             # Values must use SQLAlchemy parameter binding with :param_name syntax
@@ -316,17 +325,17 @@ def execute_tool(
             
             # Step 3: Safe execution with SQLAlchemy parameter binding
             # The rendered SQL should use :param_name syntax for values
-            # Pass arguments dictionary to db_session.exec() as params for safe binding
-            result = db_session.exec(text(rendered_sql), params=arguments).all()
+            # Pass arguments dictionary to data_session.exec() as params for safe binding
+            result = data_session.exec(text(rendered_sql), params=arguments).all()
             
-            # Log success
+            # Log success (to metadata DB)
             log_execution(
                 tool_name=tool_name,
                 persona=persona,
                 arguments=arguments,
                 status="SUCCESS",
                 result=result,
-                db_session=db_session
+                db_session=meta_session
             )
             
             return result
@@ -354,24 +363,24 @@ def execute_tool(
                     "No class inheriting from ChameleonTool found in the code"
                 )
             
-            # Step 4: Instantiate the tool with db_session and context
+            # Step 4: Instantiate the tool with sessions and context
             context = {
                 'persona': persona,
                 'tool_name': tool_name,
             }
-            tool_instance = tool_class(db_session, context)
+            tool_instance = tool_class(meta_session, context, data_session)
             
             # Step 5: Execute the tool's run method
             result = tool_instance.run(arguments)
             
-            # Log success
+            # Log success (to metadata DB)
             log_execution(
                 tool_name=tool_name,
                 persona=persona,
                 arguments=arguments,
                 status="SUCCESS",
                 result=result,
-                db_session=db_session
+                db_session=meta_session
             )
             
             return result
@@ -380,14 +389,14 @@ def execute_tool(
         # Capture the full traceback
         error_traceback_str = traceback.format_exc()
         
-        # Log failure
+        # Log failure (to metadata DB)
         log_execution(
             tool_name=tool_name,
             persona=persona,
             arguments=arguments,
             status="FAILURE",
             error_traceback_str=error_traceback_str,
-            db_session=db_session
+            db_session=meta_session
         )
         
         # Re-raise the exception so the client knows it failed
@@ -455,19 +464,20 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     ]
 
 
-def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> str:
+def get_resource(uri: Union[str, AnyUrl], persona: str, meta_session: Session, data_session: Session = None) -> str:
     """
     Get a resource by URI and execute if dynamic.
     
     This function:
-    1. Queries ResourceRegistry to find matching resource by URI
+    1. Queries ResourceRegistry to find matching resource by URI (from metadata DB)
     2. If static, returns the static_content
     3. If dynamic, executes code from CodeVault
     
     Args:
         uri: URI of the resource to retrieve (string or MCP AnyUrl)
         persona: The persona/context for which to get the resource
-        db_session: SQLModel Session for database access
+        meta_session: SQLModel Session for metadata database access
+        data_session: SQLModel Session for data database access (optional, may be None)
         
     Returns:
         The resource content as a string
@@ -475,13 +485,14 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
     Raises:
         ResourceNotFoundError: If the resource is not found
         SecurityError: If hash validation fails for dynamic resources
+        RuntimeError: If data database is required but not available
     """
     # Convert uri to string in case it's a Pydantic AnyUrl or other type
     uri_str = str(uri)
     
-    # Query ResourceRegistry for the resource by URI
+    # Query ResourceRegistry for the resource by URI (from metadata DB)
     statement = select(ResourceRegistry).where(ResourceRegistry.uri_schema == uri_str)
-    resource = db_session.exec(statement).first()
+    resource = meta_session.exec(statement).first()
     
     if not resource:
         raise ResourceNotFoundError(f"Resource with URI '{uri_str}' not found")
@@ -496,9 +507,9 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
             f"Dynamic resource '{resource.name}' has no code reference"
         )
     
-    # Fetch CodeVault content using the hash
+    # Fetch CodeVault content using the hash (from metadata DB)
     statement = select(CodeVault).where(CodeVault.hash == resource.active_hash_ref)
-    code_vault = db_session.exec(statement).first()
+    code_vault = meta_session.exec(statement).first()
     
     if not code_vault:
         raise ResourceNotFoundError(
@@ -515,6 +526,12 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
     
     # Execute based on code type
     if code_vault.code_type == 'select':
+        # Check if data_session is available
+        if data_session is None:
+            raise RuntimeError(
+                "Business database is currently offline. Use 'reconnect_db' tool to try again."
+            )
+        
         # Step 1: Render SQL template with Jinja2 for structural logic
         # Create arguments dict from available context (uri, persona)
         template_args = {
@@ -532,8 +549,8 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
         _validate_read_only(rendered_sql)
         
         # Step 3: Safe execution with SQLAlchemy parameter binding
-        # Pass template_args as params for safe binding
-        result = db_session.exec(text(rendered_sql), params=template_args).all()
+        # Pass template_args as params for safe binding (use data_session for business data)
+        result = data_session.exec(text(rendered_sql), params=template_args).all()
         return str(result)
     else:
         # Default to python execution with class-based plugin architecture
@@ -559,12 +576,12 @@ def get_resource(uri: Union[str, AnyUrl], persona: str, db_session: Session) -> 
                 "No class inheriting from ChameleonTool found in the code"
             )
         
-        # Step 4: Instantiate the tool with db_session and context
+        # Step 4: Instantiate the tool with sessions and context
         context = {
             'persona': persona,
             'uri': uri_str,
         }
-        tool_instance = tool_class(db_session, context)
+        tool_instance = tool_class(meta_session, context, data_session)
         
         # Step 5: Execute the tool's run method with uri as argument
         # For resources, pass uri in the arguments dict

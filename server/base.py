@@ -16,19 +16,25 @@ class ChameleonTool(ABC):
     that inherits from this base class.
     
     Attributes:
-        db_session: SQLModel Session for database access
+        meta_session: SQLModel Session for metadata database access (tools, logs, resources)
+        data_session: SQLModel Session for data database access (business data) - may be None
+        db_session: Legacy alias for meta_session (for backward compatibility)
         context: Dictionary containing execution context (persona, etc.)
     """
     
-    def __init__(self, db_session, context: Dict[str, Any]):
+    def __init__(self, meta_session, context: Dict[str, Any], data_session=None):
         """
-        Initialize the tool with database session and context.
+        Initialize the tool with database sessions and context.
         
         Args:
-            db_session: SQLModel Session for database access
+            meta_session: SQLModel Session for metadata database access
             context: Dictionary containing execution context information
+            data_session: SQLModel Session for data database access (optional, may be None)
         """
-        self.db_session = db_session
+        self.meta_session = meta_session
+        self.data_session = data_session
+        # Legacy alias for backward compatibility
+        self.db_session = meta_session
         self.context = context
     
     @abstractmethod

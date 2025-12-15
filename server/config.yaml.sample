@@ -18,19 +18,39 @@ server:
   # Can be absolute or relative to the current working directory
   logs_dir: "logs"
 
-database:
-  # Database connection URL
+# DEPRECATED: Single database configuration (kept for backward compatibility)
+# Use metadata_database and data_database instead for dual-engine architecture
+# database:
+#   url: "sqlite:///chameleon.db"
+#   schema: null
+
+# Metadata Database (system tables: tools, logs, resources, prompts, code vault)
+metadata_database:
+  # Database connection URL for system metadata
   # Examples:
-  #   SQLite: "sqlite:///chameleon.db"
+  #   SQLite: "sqlite:///chameleon_meta.db"
   #   PostgreSQL: "postgresql://user:password@localhost/dbname"
   #   MySQL: "mysql://user:password@localhost/dbname"
   #   Teradata: "teradata://user:password@host/database"
-  url: "sqlite:///chameleon.db"
+  url: "sqlite:///chameleon_meta.db"
   
   # Optional database schema prefix (default: None)
   # Used for enterprise databases where tables must be in a specific schema
   # Example: "retail_data" or "my_app_schema"
   # Leave commented out for SQLite (which doesn't support schemas)
+  # schema: "my_app_schema"
+
+# Data Database (business data: sales, inventory, etc.)
+data_database:
+  # Database connection URL for business/application data
+  # Examples:
+  #   SQLite: "sqlite:///chameleon_data.db" or "sqlite:///retail.db"
+  #   PostgreSQL: "postgresql://user:password@localhost/dbname"
+  #   MySQL: "mysql://user:password@localhost/dbname"
+  #   Teradata: "teradata://user:password@host/database"
+  url: "sqlite:///chameleon_data.db"
+  
+  # Optional database schema prefix (default: None)
   # schema: "my_app_schema"
 
 # Optional table name mappings (defaults shown below)
