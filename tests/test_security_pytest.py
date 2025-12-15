@@ -1,3 +1,4 @@
+from common.utils import compute_hash as _compute_hash
 """
 Pytest test suite for runtime.py security features with Jinja2 + SQLAlchemy binding.
 
@@ -12,13 +13,11 @@ import pytest
 import hashlib
 from datetime import date, timedelta
 from sqlmodel import select
-from models import CodeVault, ToolRegistry, SalesPerDay
-from runtime import execute_tool, SecurityError, ToolNotFoundError
+from server.models import CodeVault, ToolRegistry, SalesPerDay
+from server.runtime import execute_tool, ToolNotFoundError
+from common.security import SecurityError
 
 
-def _compute_hash(code: str) -> str:
-    """Compute SHA-256 hash of code."""
-    return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
 @pytest.fixture

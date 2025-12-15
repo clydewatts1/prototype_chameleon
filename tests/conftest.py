@@ -8,7 +8,7 @@ import pytest
 import tempfile
 import os
 from sqlmodel import Session, create_engine
-from models import create_db_and_tables
+from server.models import create_db_and_tables
 
 
 @pytest.fixture(scope="function")

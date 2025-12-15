@@ -1,3 +1,4 @@
+from common.utils import compute_hash as _compute_hash
 """
 Pytest test suite for the SQL Creator Meta-Tool.
 
@@ -13,9 +14,10 @@ import pytest
 from datetime import date
 from sqlmodel import select
 
-from add_sql_creator_tool import register_sql_creator_tool
-from models import CodeVault, ToolRegistry, SalesPerDay
-from runtime import execute_tool, SecurityError
+from server.add_sql_creator_tool import register_sql_creator_tool
+from server.models import CodeVault, ToolRegistry, SalesPerDay
+from server.runtime import execute_tool, ToolNotFoundError
+from common.security import SecurityError
 
 
 @pytest.fixture

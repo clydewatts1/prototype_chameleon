@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 #!/usr/bin/env python3
 """
 Demonstration of the Deep Execution Audit System for AI Self-Debugging.

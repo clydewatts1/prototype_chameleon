@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 #!/usr/bin/env python3
 """
 Demonstration script showing the SQL Creator Meta-Tool in action.
