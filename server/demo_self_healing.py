@@ -15,6 +15,7 @@ import hashlib
 from sqlmodel import Session
 from models import CodeVault, ToolRegistry, get_engine
 from runtime import execute_tool
+from config import load_config
 
 
 def _compute_hash(code: str) -> str:
@@ -30,7 +31,10 @@ def demo_self_healing_workflow():
     print("DEMO: Deep Execution Audit System - AI Self-Debugging Workflow")
     print("=" * 70)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         print("\n📝 Step 1: AI creates a fibonacci tool (with a bug)")

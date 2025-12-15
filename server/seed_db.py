@@ -8,6 +8,7 @@ import hashlib
 from datetime import date, timedelta
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables
+from config import load_config
 
 
 def _compute_hash(code: str) -> str:
@@ -39,14 +40,18 @@ def _clear_database(session: Session) -> None:
     session.commit()
 
 
-def seed_database(database_url: str = "sqlite:///chameleon.db", clear_existing: bool = True):
+def seed_database(database_url: str = None, clear_existing: bool = True):
     """
     Seed the database with sample tools.
     
     Args:
-        database_url: Database connection string
+        database_url: Database connection string. If None, loads from config.
         clear_existing: If True, clear existing data before seeding
     """
+    # Load configuration if database_url not provided
+    if database_url is None:
+        config = load_config()
+        database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
     # Create engine and tables
     engine = get_engine(database_url)
     create_db_and_tables(engine)
