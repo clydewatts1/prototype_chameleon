@@ -13,6 +13,7 @@ from models import get_engine, create_db_and_tables, SalesPerDay
 from runtime import execute_tool
 from seed_db import seed_database
 from datetime import date
+from config import load_config
 
 
 def demo_create_simple_tool():
@@ -21,7 +22,10 @@ def demo_create_simple_tool():
     print("DEMO 1: Creating a Simple SQL Tool")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         print("\n📝 Using create_new_sql_tool to create 'get_all_stores'...")
@@ -52,7 +56,10 @@ def demo_create_parameterized_tool():
     print("DEMO 2: Creating a Parameterized SQL Tool")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         print("\n📝 Creating 'get_sales_by_department' with parameter...")
@@ -103,7 +110,10 @@ def demo_create_complex_tool():
     print("DEMO 3: Creating a Complex SQL Tool with Multiple Parameters")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         print("\n📝 Creating 'get_sales_report' with date range parameters...")
@@ -164,7 +174,10 @@ def demo_security_validation():
     print("DEMO 4: Security Validation Features")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         # Test 1: Non-SELECT query

@@ -7,6 +7,7 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 from seed_db import seed_database
+from config import load_config
 
 
 def test_integration():
@@ -19,7 +20,10 @@ def test_integration():
     print("\n1. Seeding database...")
     seed_database(clear_existing=True)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         # Test 1: Python tool execution (existing functionality)

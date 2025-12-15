@@ -12,6 +12,7 @@ from sqlmodel import Session
 from models import get_engine, create_db_and_tables
 from runtime import execute_tool
 from seed_db import seed_database
+from config import load_config
 
 
 def demo_sales_summary():
@@ -20,7 +21,10 @@ def demo_sales_summary():
     print("DEMO 1: Sales Summary with Optional Filtering")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         # Test 1: Get all sales summary
@@ -62,7 +66,10 @@ def demo_sales_by_category():
     print("DEMO 2: Sales by Category with Date Filtering")
     print("=" * 60)
     
-    engine = get_engine("sqlite:///chameleon.db")
+    # Load database URL from config
+    config = load_config()
+    database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
+    engine = get_engine(database_url)
     
     with Session(engine) as session:
         # Test 1: Get all sales by category

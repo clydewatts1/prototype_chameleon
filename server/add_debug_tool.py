@@ -8,6 +8,7 @@ for detailed error information including full Python tracebacks.
 import hashlib
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, get_engine
+from config import load_config
 
 
 def _compute_hash(code: str) -> str:
@@ -23,13 +24,17 @@ def _compute_hash(code: str) -> str:
     return hashlib.sha256(code.encode('utf-8')).hexdigest()
 
 
-def add_debug_tool(database_url: str = "sqlite:///chameleon.db"):
+def add_debug_tool(database_url: str = None):
     """
     Add the get_last_error debugging tool to the database.
     
     Args:
-        database_url: Database connection string
+        database_url: Database connection string. If None, loads from config.
     """
+    # Load configuration if database_url not provided
+    if database_url is None:
+        config = load_config()
+        database_url = config.get('database', {}).get('url', 'sqlite:///chameleon.db')
     engine = get_engine(database_url)
     
     print("=" * 60)
