@@ -45,46 +45,13 @@ def register_resource_bridge_tool(database_url: str = None):
         print(f"❌ Failed to create database engine: {e}")
         return False
     
-    # Define the tool code blob
-    tool_code = """from base import ChameleonTool
-from runtime import get_resource, ResourceNotFoundError
-from sqlmodel import select
-from models import ResourceRegistry
-
-class ReadResourceTool(ChameleonTool):
-    def run(self, arguments):
-        '''
-        Read a resource by URI from the ResourceRegistry.
-        
-        This tool enables clients that only support Tools (not Resources)
-        to fetch resource data manually.
-        '''
-        uri = arguments.get('uri')
-        
-        if not uri:
-            return "Error: 'uri' parameter is required"
-        
-        # Get persona from context, default to 'default'
-        persona = self.context.get('persona', 'default')
-        
-        try:
-            # Call get_resource to fetch the resource
-            result = get_resource(uri, persona, self.db_session)
-            return result
-        except ResourceNotFoundError as e:
-            # Query ResourceRegistry for available URIs to help self-correction
-            statement = select(ResourceRegistry).where(
-                ResourceRegistry.target_persona == persona
-            )
-            available_resources = self.db_session.exec(statement).all()
-            
-            if available_resources:
-                available_uris = [r.uri_schema for r in available_resources]
-                uris_list = '\\n  - '.join(available_uris)
-                return f"Resource not found: {uri}\\n\\nAvailable resources are:\\n  - {uris_list}"
-            else:
-                return f"Resource not found: {uri}\\n\\nNo resources available for persona '{persona}'"
-"""
+    # Load the tool code from file
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    tool_code_path = os.path.join(script_dir, '..', 'tools', 'system', 'resource_bridge.py')
+    with open(tool_code_path, 'r') as f:
+        tool_code = f.read()
+    
     
     tool_hash = compute_hash(tool_code)
     
