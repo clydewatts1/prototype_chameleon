@@ -22,8 +22,8 @@ def check_file_uses_config(filepath):
     # Check if file imports config
     has_config_import = 'from config import load_config' in content
     
-    # Check for hardcoded database URLs
-    hardcoded_pattern = r'get_engine\s*\(\s*["\']sqlite:///[^"\']+["\']'
+    # Check for hardcoded database URLs (SQLite, PostgreSQL, MySQL, etc.)
+    hardcoded_pattern = r'get_engine\s*\(\s*["\'][^"\']*://[^"\']+["\']'
     has_hardcoded = re.search(hardcoded_pattern, content)
     
     # Check if it uses config to get database URL
@@ -138,7 +138,9 @@ def main():
     print("Database Configuration Consistency Tests")
     print("=" * 60)
     
-    os.chdir('/home/runner/work/prototype_chameleon/prototype_chameleon/server')
+    # Change to the server directory (works in any environment)
+    server_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(server_dir)
     
     results = []
     results.append(test_demo_scripts())
