@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 """
 Script to add the 'reconnect_db' system tool for reconnecting to the data database at runtime.
 

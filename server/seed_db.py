@@ -4,6 +4,11 @@ Database seeder script for inserting sample tools.
 This script populates the database with sample tools for testing the MCP server.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
 from common.utils import compute_hash
 from datetime import date, timedelta
 from sqlmodel import Session, select

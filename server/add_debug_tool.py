@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 """
 Script to add the get_last_error debugging tool to the database.
 
@@ -32,7 +36,6 @@ def add_debug_tool(database_url: str = None):
     
     with Session(engine) as session:
         # Load the tool code from file
-        import os
         script_dir = os.path.dirname(os.path.abspath(__file__))
         tool_code_path = os.path.join(script_dir, '..', 'tools', 'system', 'debug_tool.py')
         with open(tool_code_path, 'r') as f:

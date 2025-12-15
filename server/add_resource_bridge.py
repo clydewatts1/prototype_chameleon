@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 """
 Script to add the read_resource tool to support clients that don't implement MCP Resources.
 
@@ -7,7 +11,6 @@ from the ResourceRegistry manually by calling the read_resource tool.
 """
 
 from common.utils import compute_hash
-import sys
 from sqlmodel import Session, select
 
 from config import load_config
@@ -46,7 +49,6 @@ def register_resource_bridge_tool(database_url: str = None):
         return False
     
     # Load the tool code from file
-    import os
     script_dir = os.path.dirname(os.path.abspath(__file__))
     tool_code_path = os.path.join(script_dir, '..', 'tools', 'system', 'resource_bridge.py')
     with open(tool_code_path, 'r') as f:

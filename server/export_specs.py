@@ -7,6 +7,11 @@ and their associated Code) into a clean, readable YAML file that matches the for
 expected by load_specs.py.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
 import argparse
 import sys
 from typing import Dict, Any, List, Optional

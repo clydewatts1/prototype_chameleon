@@ -9,10 +9,12 @@ Usage:
     python add_sql_creator_tool.py
 """
 
-from common.utils import compute_hash
 import sys
-from sqlmodel import Session, select
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from common.utils import compute_hash
+from sqlmodel import Session, select
 from config import load_config
 from models import CodeVault, ToolRegistry, get_engine, create_db_and_tables
 
@@ -55,7 +57,6 @@ def register_sql_creator_tool(database_url: str = None):
             tool_code = f.read()
     except FileNotFoundError:
         # Fallback to relative path from server directory
-        import os
         script_dir = os.path.dirname(os.path.abspath(__file__))
         tool_code_path = os.path.join(script_dir, "..", "tools", "system", "sql_creator.py")
         try:

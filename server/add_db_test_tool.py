@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 """
 Standalone diagnostic script for Chameleon MCP Server.
 
@@ -11,7 +15,6 @@ Usage:
 """
 
 from common.utils import compute_hash
-import sys
 from sqlmodel import Session, select
 
 from config import load_config

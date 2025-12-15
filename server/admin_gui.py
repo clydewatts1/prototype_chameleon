@@ -5,6 +5,11 @@ This module provides a web-based admin interface for managing tools, code blobs,
 and personas in the Chameleon MCP server database.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
 import os
 import json
 import streamlit as st

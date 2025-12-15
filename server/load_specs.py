@@ -6,6 +6,11 @@ This script loads tool, resource, and prompt definitions from a YAML file
 and syncs them to the database with idempotent upsert operations.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
 import argparse
 import hashlib
 import sys
