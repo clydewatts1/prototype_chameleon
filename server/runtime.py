@@ -313,6 +313,40 @@ def execute_tool(
             )
             
             return result
+        elif code_type == 'streamlit':
+            # Handle Streamlit dashboard code
+            # Check if feature is enabled
+            from config import load_config
+            config = load_config()
+            ui_config = config.get('features', {}).get('chameleon_ui', {})
+            
+            if not ui_config.get('enabled', True):
+                raise RuntimeError(
+                    "Chameleon UI feature is disabled in configuration"
+                )
+            
+            # For Streamlit dashboards, we don't execute the code here
+            # Instead, we return a message with the URL to access the dashboard
+            # The dashboard should already be written to file by the create_dashboard tool
+            
+            # Get the base URL for Streamlit (default port 8501)
+            base_url = "http://localhost:8501"
+            
+            # The dashboard should be accessible at the base URL
+            # Streamlit will show all available apps in the ui_apps directory
+            result = f"Dashboard is ready! Access it at: {base_url}/?page={tool_name}"
+            
+            # Log success (to metadata DB)
+            log_execution(
+                tool_name=tool_name,
+                persona=persona,
+                arguments=arguments,
+                status="SUCCESS",
+                result=result,
+                db_session=meta_session
+            )
+            
+            return result
         else:
             # Default to python execution with class-based plugin architecture
             # Step 1: Validate code structure
