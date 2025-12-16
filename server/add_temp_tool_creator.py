@@ -52,21 +52,16 @@ def register_temp_tool_creator(database_url: str = None):
         print(f"❌ Failed to create database engine: {e}")
         return False
     
-    # Load the meta-tool code from file
-    tool_code_path = "../tools/system/test_tool_creator.py"
+    # Load the meta-tool code from file using robust path resolution
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    tool_code_path = os.path.join(script_dir, "..", "tools", "system", "test_tool_creator.py")
+    
     try:
         with open(tool_code_path, 'r') as f:
             tool_code = f.read()
     except FileNotFoundError:
-        # Fallback to relative path from server directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        tool_code_path = os.path.join(script_dir, "..", "tools", "system", "test_tool_creator.py")
-        try:
-            with open(tool_code_path, 'r') as f:
-                tool_code = f.read()
-        except FileNotFoundError:
-            print(f"❌ Could not find tool code at {tool_code_path}")
-            return False
+        print(f"❌ Could not find tool code at {tool_code_path}")
+        return False
     
     tool_hash = compute_hash(tool_code)
     

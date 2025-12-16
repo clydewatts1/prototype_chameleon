@@ -34,8 +34,7 @@ class CreateTempTestTool(ChameleonTool):
             Success message confirming the temporary tool is registered
         """
         # Import here to avoid circular imports
-        import sys
-        sys.path.insert(0, '/home/runner/work/prototype_chameleon/prototype_chameleon/server')
+        # runtime module is in the same search path due to how tools are loaded
         from runtime import TEMP_TOOL_REGISTRY, TEMP_CODE_VAULT
         
         # Extract arguments

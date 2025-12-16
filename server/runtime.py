@@ -18,6 +18,7 @@ EXECUTION CONTRACT:
 """
 
 import inspect
+import re
 import sys
 import traceback
 import json
@@ -254,7 +255,6 @@ def execute_tool(
             # Step 3: For temporary tools, inject LIMIT 3 to prevent large data retrieval
             if is_temp_tool:
                 # Remove any existing LIMIT clause and add LIMIT 3
-                import re
                 # Remove trailing semicolons and whitespace
                 sql_stripped = rendered_sql.rstrip().rstrip(';').rstrip()
                 # Remove any existing LIMIT clause (case-insensitive)
