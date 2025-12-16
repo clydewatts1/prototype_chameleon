@@ -86,7 +86,7 @@ def _load_macros(meta_session: Session) -> str:
         or empty string if no active macros exist.
     """
     # Query all active macros
-    statement = select(MacroRegistry).where(MacroRegistry.is_active == True)
+    statement = select(MacroRegistry).where(MacroRegistry.is_active)
     macros = meta_session.exec(statement).all()
     
     if not macros:

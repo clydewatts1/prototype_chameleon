@@ -32,11 +32,11 @@ class MacroCreatorTool(ChameleonTool):
         # Validation 2: Ensure template starts with {% macro
         template_stripped = template.strip()
         if not template_stripped.startswith('{% macro'):
-            return f"Error: template must start with '{{% macro'. Got: {template_stripped[:50]}..."
+            return "Error: template must start with '{% macro'"
         
         # Validation 3: Ensure template ends with {% endmacro %}
         if not template_stripped.endswith('{% endmacro %}'):
-            return f"Error: template must end with '{{% endmacro %}}'. Got: ...{template_stripped[-50:]}"
+            return "Error: template must end with '{% endmacro %}'"
         
         self.log(f"Creating macro: {name}")
         self.log(f"Macro validation passed")
