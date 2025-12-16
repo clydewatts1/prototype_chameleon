@@ -38,10 +38,14 @@ fi
 # Run streamlit with the apps directory
 # Note: Streamlit doesn't natively support multi-app directory browsing
 # So we'll use a simple approach - run the first .py file found, or provide instructions
-if [ -n "$(find "$APPS_DIR" -maxdepth 1 -name '*.py' -print -quit)" ]; then
+
+# Find the first .py file
+FIRST_DASHBOARD=$(find "$APPS_DIR" -maxdepth 1 -name '*.py' -print -quit)
+
+if [ -n "$FIRST_DASHBOARD" ]; then
     # If there are multiple dashboards, Streamlit will need a multipage app structure
-    # For now, we'll launch streamlit pointing to the directory
-    cd "$APPS_DIR" && streamlit run --server.port="$PORT" --server.address=localhost $(ls *.py | head -n 1)
+    # For now, we'll launch streamlit with the first dashboard found
+    streamlit run --server.port="$PORT" --server.address=localhost "$FIRST_DASHBOARD"
 else
     echo "⚠️  No dashboard files found in $APPS_DIR"
     echo ""
