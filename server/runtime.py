@@ -18,6 +18,7 @@ EXECUTION CONTRACT:
 """
 
 import inspect
+import re
 import sys
 import traceback
 import json
@@ -35,6 +36,23 @@ from common.security import (
     validate_read_only,
     validate_code_structure
 )
+
+
+# In-memory storage for temporary test tools
+# These tools are not persisted to the database and are only available during runtime
+TEMP_TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {}
+"""
+Dictionary storing temporary tool metadata.
+Key: tool_name
+Value: dict with keys: description, input_schema, target_persona, code_hash, is_temp
+"""
+
+TEMP_CODE_VAULT: Dict[str, Dict[str, Any]] = {}
+"""
+Dictionary storing temporary code.
+Key: code_hash
+Value: dict with keys: code_blob, code_type
+"""
 
 
 class ToolNotFoundError(Exception):
@@ -135,14 +153,16 @@ def execute_tool(
     data_session: Session = None
 ) -> Any:
     """
-    Execute a tool by fetching and running its code from the database.
+    Execute a tool by fetching and running its code from the database or temporary storage.
     
     This function:
-    1. Queries ToolRegistry for the tool (from metadata DB)
-    2. Fetches CodeVault content using the hash (from metadata DB)
-    3. Re-hashes the content for security validation
-    4. Executes the code in a sandboxed environment
-    5. Logs execution (SUCCESS or FAILURE) to ExecutionLog (in metadata DB)
+    1. Checks TEMP_TOOL_REGISTRY for temporary tools first
+    2. Falls back to querying ToolRegistry for the tool (from metadata DB)
+    3. Fetches code from TEMP_CODE_VAULT or CodeVault
+    4. Re-hashes the content for security validation (for DB tools)
+    5. Executes the code in a sandboxed environment
+    6. For temporary SQL tools, injects LIMIT 3 constraint
+    7. Logs execution (SUCCESS or FAILURE) to ExecutionLog (in metadata DB)
     
     Args:
         tool_name: Name of the tool to execute
@@ -155,42 +175,64 @@ def execute_tool(
         The result of the tool execution
         
     Raises:
-        ToolNotFoundError: If the tool is not found in the registry
+        ToolNotFoundError: If the tool is not found in the registry or temporary storage
         SecurityError: If hash validation fails
         RuntimeError: If data database is required but not available
     """
     try:
-        # Query ToolRegistry for the tool (from metadata DB)
-        statement = select(ToolRegistry).where(
-            ToolRegistry.tool_name == tool_name,
-            ToolRegistry.target_persona == persona
-        )
-        tool = meta_session.exec(statement).first()
+        # Check if this is a temporary tool first
+        is_temp_tool = False
+        temp_tool_key = f"{tool_name}:{persona}"
         
-        if not tool:
-            raise ToolNotFoundError(
-                f"Tool '{tool_name}' not found for persona '{persona}'"
+        if temp_tool_key in TEMP_TOOL_REGISTRY:
+            is_temp_tool = True
+            tool_meta = TEMP_TOOL_REGISTRY[temp_tool_key]
+            code_hash = tool_meta['code_hash']
+            
+            # Fetch code from temporary storage
+            if code_hash not in TEMP_CODE_VAULT:
+                raise ToolNotFoundError(
+                    f"Temporary tool code not found for '{tool_name}'"
+                )
+            
+            code_data = TEMP_CODE_VAULT[code_hash]
+            code_blob = code_data['code_blob']
+            code_type = code_data['code_type']
+        else:
+            # Query ToolRegistry for the tool (from metadata DB)
+            statement = select(ToolRegistry).where(
+                ToolRegistry.tool_name == tool_name,
+                ToolRegistry.target_persona == persona
             )
-        
-        # Fetch CodeVault content using the hash (from metadata DB)
-        statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
-        code_vault = meta_session.exec(statement).first()
-        
-        if not code_vault:
-            raise ToolNotFoundError(
-                f"Code not found for hash '{tool.active_hash_ref}'"
-            )
-        
-        # Security: Re-hash the content and validate
-        computed_hash = compute_hash(code_vault.code_blob)
-        if computed_hash != code_vault.hash:
-            raise SecurityError(
-                f"Hash mismatch! Expected '{code_vault.hash}', "
-                f"got '{computed_hash}'. Code may be corrupted."
-            )
+            tool = meta_session.exec(statement).first()
+            
+            if not tool:
+                raise ToolNotFoundError(
+                    f"Tool '{tool_name}' not found for persona '{persona}'"
+                )
+            
+            # Fetch CodeVault content using the hash (from metadata DB)
+            statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
+            code_vault = meta_session.exec(statement).first()
+            
+            if not code_vault:
+                raise ToolNotFoundError(
+                    f"Code not found for hash '{tool.active_hash_ref}'"
+                )
+            
+            # Security: Re-hash the content and validate
+            computed_hash = compute_hash(code_vault.code_blob)
+            if computed_hash != code_vault.hash:
+                raise SecurityError(
+                    f"Hash mismatch! Expected '{code_vault.hash}', "
+                    f"got '{computed_hash}'. Code may be corrupted."
+                )
+            
+            code_blob = code_vault.code_blob
+            code_type = code_vault.code_type
         
         # Execute based on code type
-        if code_vault.code_type == 'select':
+        if code_type == 'select':
             # Check if data_session is available
             if data_session is None:
                 raise RuntimeError(
@@ -200,7 +242,7 @@ def execute_tool(
             # Step 1: Render SQL template with Jinja2 for structural logic
             # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
             # Values must use SQLAlchemy parameter binding with :param_name syntax
-            template = Template(code_vault.code_blob)
+            template = Template(code_blob)
             rendered_sql = template.render(arguments=arguments)
             
             # Step 2: Security validation
@@ -210,7 +252,17 @@ def execute_tool(
             # Validate read-only (only SELECT statements allowed)
             validate_read_only(rendered_sql)
             
-            # Step 3: Safe execution with SQLAlchemy parameter binding
+            # Step 3: For temporary tools, inject LIMIT 3 to prevent large data retrieval
+            if is_temp_tool:
+                # Remove any existing LIMIT clause and add LIMIT 3
+                # Remove trailing semicolons and whitespace
+                sql_stripped = rendered_sql.rstrip().rstrip(';').rstrip()
+                # Remove any existing LIMIT clause (case-insensitive)
+                sql_no_limit = re.sub(r'\s+LIMIT\s+\d+\s*$', '', sql_stripped, flags=re.IGNORECASE)
+                # Add mandatory LIMIT 3
+                rendered_sql = f"{sql_no_limit} LIMIT 3"
+            
+            # Step 4: Safe execution with SQLAlchemy parameter binding
             # The rendered SQL should use :param_name syntax for values
             # Pass arguments dictionary to data_session.exec() as params for safe binding
             result = data_session.exec(text(rendered_sql), params=arguments).all()
@@ -229,12 +281,12 @@ def execute_tool(
         else:
             # Default to python execution with class-based plugin architecture
             # Step 1: Validate code structure
-            validate_code_structure(code_vault.code_blob)
+            validate_code_structure(code_blob)
             
             # Step 2: Execute the code to load the class definition
             # Create a namespace with base class available
             namespace = {'ChameleonTool': ChameleonTool}
-            exec(code_vault.code_blob, namespace)
+            exec(code_blob, namespace)
             
             # Step 3: Find the class that inherits from ChameleonTool
             tool_class = None
@@ -292,7 +344,7 @@ def execute_tool(
 
 def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
     """
-    List all available tools for a specific persona.
+    List all available tools for a specific persona, including temporary test tools.
     
     Args:
         persona: The persona/context to filter tools by
@@ -318,6 +370,19 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
             'description': desc,
             'input_schema': tool.input_schema,
         })
+    
+    # Add temporary tools for this persona
+    for key, tool_meta in TEMP_TOOL_REGISTRY.items():
+        tool_name_from_key, tool_persona = key.split(':', 1)
+        if tool_persona == persona:
+            desc = tool_meta['description']
+            desc = f"[TEMP-TEST] {desc}"
+            
+            results.append({
+                'name': tool_name_from_key,
+                'description': desc,
+                'input_schema': tool_meta['input_schema'],
+            })
     
     return results
 
