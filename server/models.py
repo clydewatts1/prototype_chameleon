@@ -177,6 +177,28 @@ class ExecutionLog(SQLModel, table=True):
     error_traceback: str | None = Field(sa_column=Column(Text), default=None, description="Full Python traceback for failures")
 
 
+class MacroRegistry(SQLModel, table=True):
+    """
+    Table for storing reusable Jinja2 macros for SQL tools.
+    
+    Macros allow defining common SQL logic (e.g., fiscal year calculations, 
+    safe division) that can be shared across multiple SQL tools.
+    
+    Attributes:
+        name: Name of the macro (Primary Key, e.g., 'safe_div')
+        description: Description of what the macro does
+        template: The Jinja2 macro definition (must start with {% macro and end with {% endmacro %})
+        is_active: Whether the macro is currently active (only active macros are loaded)
+    """
+    __tablename__ = _table_config.get('macro_registry', 'macroregistry')
+    __table_args__ = _schema_arg
+    
+    name: str = Field(primary_key=True, description="Name of the macro (e.g., 'safe_div')")
+    description: str = Field(description="Description of what the macro does")
+    template: str = Field(sa_column=Column(Text), description="The Jinja2 macro definition")
+    is_active: bool = Field(default=True, description="Whether the macro is currently active")
+
+
 # Database engine setup
 # Usage: engine = get_engine("sqlite:///database.db")
 # For production, replace with appropriate database URL
@@ -196,7 +218,7 @@ def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
 
 
 # Model classification for dual-engine architecture
-METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog]
+METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry]
 DATA_MODELS = [SalesPerDay]
 
 
