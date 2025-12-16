@@ -71,7 +71,7 @@ class CodeVault(SQLModel, table=True):
     
     hash: str = Field(primary_key=True, description="SHA-256 hash of the code")
     code_blob: str = Field(description="The executable code")
-    code_type: str = Field(default="python", description="Type of code: 'python' or 'select'")
+    code_type: str = Field(default="python", description="Type of code: 'python', 'select', or 'streamlit'")
 
 
 class ToolRegistry(SQLModel, table=True):

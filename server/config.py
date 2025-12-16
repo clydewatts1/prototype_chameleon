@@ -44,6 +44,12 @@ def get_default_config() -> Dict[str, Any]:
             'prompt_registry': 'promptregistry',
             'sales_per_day': 'sales_per_day',
             'execution_log': 'executionlog'
+        },
+        'features': {
+            'chameleon_ui': {
+                'enabled': True,
+                'apps_dir': 'ui_apps'
+            }
         }
     }
 
@@ -96,6 +102,11 @@ def load_config() -> Dict[str, Any]:
             # Update table settings
             if 'tables' in yaml_config:
                 config['tables'].update(yaml_config['tables'])
+            
+            # Update features settings
+            if 'features' in yaml_config:
+                if 'chameleon_ui' in yaml_config['features']:
+                    config['features']['chameleon_ui'].update(yaml_config['features']['chameleon_ui'])
         
         return config
     
