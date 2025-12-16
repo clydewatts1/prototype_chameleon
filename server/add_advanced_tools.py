@@ -258,7 +258,7 @@ class ExecuteDDLTool(ChameleonTool):
         sql_upper = ddl_command.strip().upper()
         
         # Remove SQL comments
-        sql_cleaned = re.sub(r'--[^\\n]*', '', sql_upper)
+        sql_cleaned = re.sub(r'--[^\\r\\n]*', '', sql_upper)
         sql_cleaned = re.sub(r'/\\*.*?\\*/', '', sql_cleaned, flags=re.DOTALL)
         sql_cleaned = sql_cleaned.strip()
         

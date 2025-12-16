@@ -402,7 +402,7 @@ def test_ddl_tool_prevents_multiple_statements(setup_advanced_tools, db_session)
     session = db_session
     
     # Try to inject multiple statements
-    ddl_command = "CREATE TABLE test1 (id INTEGER); DROP TABLE codevault;"
+    ddl_command = "CREATE TABLE test1 (id INTEGER); DROP TABLE test_users;"
     
     arguments = {
         "ddl_command": ddl_command,
