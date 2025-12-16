@@ -27,7 +27,7 @@ from sqlmodel import Session, select
 from sqlalchemy import text
 from mcp.types import AnyUrl
 from jinja2 import Template
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry
 from base import ChameleonTool
 from common.utils import compute_hash
 from common.security import (
@@ -68,6 +68,33 @@ class ResourceNotFoundError(Exception):
 class PromptNotFoundError(Exception):
     """Raised when a prompt is not found in the registry."""
     pass
+
+
+def _load_macros(meta_session: Session) -> str:
+    """
+    Load all active Jinja2 macros from the MacroRegistry.
+    
+    This function queries the MacroRegistry for all active macros and
+    concatenates their template strings into a single block that can be
+    prepended to SQL tool templates.
+    
+    Args:
+        meta_session: SQLModel Session for metadata database access
+        
+    Returns:
+        String containing all active macro definitions concatenated together,
+        or empty string if no active macros exist.
+    """
+    # Query all active macros
+    statement = select(MacroRegistry).where(MacroRegistry.is_active == True)
+    macros = meta_session.exec(statement).all()
+    
+    if not macros:
+        return ""
+    
+    # Concatenate all macro templates with newlines between them
+    macro_block = "\n\n".join(macro.template for macro in macros)
+    return macro_block
 
 
 def log_execution(
@@ -239,20 +266,28 @@ def execute_tool(
                     "Business database is currently offline. Use 'reconnect_db' tool to try again."
                 )
             
-            # Step 1: Render SQL template with Jinja2 for structural logic
+            # Step 1: Load active macros and prepend to SQL template
+            macro_block = _load_macros(meta_session)
+            if macro_block:
+                # Prepend macro definitions to the SQL template
+                code_blob_with_macros = f"{macro_block}\n\n{code_blob}"
+            else:
+                code_blob_with_macros = code_blob
+            
+            # Step 2: Render SQL template with Jinja2 for structural logic
             # IMPORTANT: Jinja2 is used ONLY for structural elements (e.g., optional WHERE clauses)
             # Values must use SQLAlchemy parameter binding with :param_name syntax
-            template = Template(code_blob)
+            template = Template(code_blob_with_macros)
             rendered_sql = template.render(arguments=arguments)
             
-            # Step 2: Security validation
+            # Step 3: Security validation
             # Validate single statement (no SQL injection via multiple statements)
             validate_single_statement(rendered_sql)
             
             # Validate read-only (only SELECT statements allowed)
             validate_read_only(rendered_sql)
             
-            # Step 3: For temporary tools, inject LIMIT 3 to prevent large data retrieval
+            # Step 4: For temporary tools, inject LIMIT 3 to prevent large data retrieval
             if is_temp_tool:
                 # Remove any existing LIMIT clause and add LIMIT 3
                 # Remove trailing semicolons and whitespace
@@ -262,7 +297,7 @@ def execute_tool(
                 # Add mandatory LIMIT 3
                 rendered_sql = f"{sql_no_limit} LIMIT 3"
             
-            # Step 4: Safe execution with SQLAlchemy parameter binding
+            # Step 5: Safe execution with SQLAlchemy parameter binding
             # The rendered SQL should use :param_name syntax for values
             # Pass arguments dictionary to data_session.exec() as params for safe binding
             result = data_session.exec(text(rendered_sql), params=arguments).all()
