@@ -65,6 +65,9 @@ db.sqlite3-journal
 chameleon.db
 *.db
 
+# Chameleon UI - Generated dashboard files
+ui_apps/
+
 # Flask stuff:
 instance/
 .webassets-cache
