@@ -493,7 +493,8 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     
     # Add temporary resources for this persona
     for key, resource_meta in TEMP_RESOURCE_REGISTRY.items():
-        uri_from_key, resource_persona = key.split(':', 1)
+        # Split from right to handle URIs with colons (e.g., "memo://test:default")
+        uri_from_key, resource_persona = key.rsplit(':', 1)
         if resource_persona == persona:
             desc = resource_meta['description']
             desc = f"[TEMP] {desc}"
