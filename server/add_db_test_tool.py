@@ -14,7 +14,7 @@ Usage:
     python add_db_test_tool.py
 """
 
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from sqlmodel import Session, select
 
 from config import load_config

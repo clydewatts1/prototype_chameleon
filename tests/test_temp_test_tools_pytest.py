@@ -1,8 +1,9 @@
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from common.utils import compute_hash as _compute_hash
+from common.hash_utils import compute_hash as _compute_hash
 """
 Pytest test suite for the Temporary Test Tools feature.
 
@@ -212,15 +213,15 @@ def test_execute_temp_tool_with_limit_3(registered_temp_tool_creator, sample_sal
 
 
 @pytest.mark.integration
-def test_temp_tool_overrides_existing_limit(registered_temp_tool_creator, sample_sales_data):
-    """Test that temporary tool overrides any existing LIMIT clause with LIMIT 3."""
+def test_temp_tool_rejects_existing_limit(registered_temp_tool_creator, sample_sales_data):
+    """Test that temporary tool rejects any existing LIMIT clause."""
     session = sample_sales_data
     
     # Clear any existing temporary tools
     TEMP_TOOL_REGISTRY.clear()
     TEMP_CODE_VAULT.clear()
     
-    # Create a temporary test tool with LIMIT 10 (should be overridden)
+    # Create a temporary test tool with LIMIT 10 (should be rejected)
     result = execute_tool(
         'create_temp_test_tool',
         'default',
@@ -233,20 +234,9 @@ def test_temp_tool_overrides_existing_limit(registered_temp_tool_creator, sample
         session
     )
     
-    assert 'Success' in result
-    
-    # Execute the temporary tool (pass session as both meta and data session)
-    sales_result = execute_tool(
-        'test_limited_sales',
-        'default',
-        {},
-        session,  # meta_session
-        session   # data_session
-    )
-    
-    # Should return exactly 3 rows, not 10
-    assert sales_result is not None
-    assert len(sales_result) == 3, f"Expected 3 rows (LIMIT 3 override), got {len(sales_result)}"
+    # Should return Error
+    assert 'Error' in result
+    assert 'Do not include LIMIT clause' in result
 
 
 @pytest.mark.integration

@@ -1,5 +1,5 @@
 from base import ChameleonTool
-import hashlib
+from common.hash_utils import compute_hash
 import re
 
 
@@ -73,11 +73,19 @@ class CreateTempTestTool(ChameleonTool):
         if ';' in sql_no_trailing:
             return "Error: sql_query cannot contain semicolons (;) in the middle. Only single statements are allowed."
         
+        # Validation 4: Check if LIMIT is already present
+        if re.search(r'\bLIMIT\b', sql_cleaned):
+             return "Error: Do not include LIMIT clause. Test tools automatically enforce LIMIT 3."
+             
+        # Enforce LIMIT 3
+        # Strip trailing semicolon and append LIMIT 3
+        sql_query = sql_query.strip().rstrip(';') + " LIMIT 3"
+        
         self.log(f"Creating temporary test tool: {tool_name}")
-        self.log(f"SQL Query validation passed")
+        self.log(f"SQL Query validation passed. Auto-appended LIMIT 3.")
         
         # Compute SHA-256 hash of the sql_query
-        code_hash = hashlib.sha256(sql_query.encode('utf-8')).hexdigest()
+        code_hash = compute_hash(sql_query)
         
         try:
             # Store code in TEMP_CODE_VAULT

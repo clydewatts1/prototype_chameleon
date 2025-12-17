@@ -1,0 +1,11 @@
+mcp
+sqlmodel
+sqlalchemy
+uvicorn
+starlette
+streamlit
+jinja2
+pyyaml
+pytest
+sqlparse
+requests

@@ -115,7 +115,7 @@ python add_ui_tool.py
   "tool": "create_dashboard",
   "arguments": {
     "dashboard_name": "sales_analytics",
-    "python_code": "import streamlit as st\n\nst.title('Sales Dashboard')\nst.write('Hello!')"
+    "python_code": "import streamlit as st\\n\\nst.title('Sales Dashboard')\\nst.write('Hello!')"
   }
 }
 ```
@@ -215,3 +215,39 @@ The Chameleon UI feature has been successfully implemented with:
 - ✅ Backward compatibility maintained
 
 The feature enables LLMs to create interactive data visualizations and user interfaces dynamically, opening new possibilities for AI-driven application development.
+
+---
+
+# Refactoring and Securing MCP Server - Implementation Summary
+
+## Overview
+Implemented critical refactoring and security hardening measures to improve the stability, security, and maintainability of the Chameleon MCP Server.
+
+## Key Accomplishments
+
+### 1. Code Hygiene & Refactoring
+- **Hash Utility Migration**: Moved `compute_hash` from `common/utils.py` to dedicated `common/hash_utils.py` and updated all 14+ references across the codebase.
+- **Legacy Engine Removal**: Successfully removed the global `_db_engine` fallback mechanism, enforcing the dual-engine architecture (`_meta_engine` and `_data_engine`).
+- **Logging Guard**: Implemented idempotency checks in `setup_logging` to prevent duplicate log handlers.
+
+### 2. Security Hardening
+- **Enhanced Security Module**: Overhauled `common/security.py` with `sqlparse` integration.
+- **Stronger SQL Validation**: Replaced regex-based validation with robust token-based analysis to strictly enforce `SELECT`-only queries and detecting hidden DML/DDL keywords.
+- **Strict AST Validation**: Extended `validate_code_structure` to block dangerous imports (`importlib`, `subprocess`) and functions (`exec`, `eval`, `open`, `os.system`).
+
+### 3. Feature Enhancements
+- **Reconnect Tool**: Refactored `server/add_reconnect_tool.py` to use an exponential back-off strategy (max 5 attempts) for robust database reconnection.
+- **LIMIT Enforcement**: Updated `tools/system/test_tool_creator.py` to automatically append `LIMIT 3` to temporary SQL test tools, preventing accidental large data retrieval.
+
+### 4. Dependencies
+- Added `sqlparse` for robust SQL parsing and validation.
+
+## Files Modified
+- `common/hash_utils.py` (Created)
+- `common/utils.py`
+- `common/security.py`
+- `server/server.py`
+- `server/add_reconnect_tool.py`
+- `tools/system/test_tool_creator.py`
+- `requirements.txt`
+- Various tool registration scripts and tests (updated imports).

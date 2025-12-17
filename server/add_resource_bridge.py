@@ -10,7 +10,7 @@ This tool enables clients (like Gemini CLI) that only support Tools to fetch dat
 from the ResourceRegistry manually by calling the read_resource tool.
 """
 
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from sqlmodel import Session, select
 
 from config import load_config

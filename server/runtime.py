@@ -29,7 +29,7 @@ from mcp.types import AnyUrl
 from jinja2 import Template
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry
 from base import ChameleonTool
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from common.security import (
     SecurityError,
     validate_single_statement,

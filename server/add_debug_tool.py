@@ -9,7 +9,7 @@ This tool enables AI self-debugging by querying the ExecutionLog table
 for detailed error information including full Python tracebacks.
 """
 
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, get_engine
 from config import load_config

@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select, create_engine
 from config import load_config
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 
 
 # Database connection setup

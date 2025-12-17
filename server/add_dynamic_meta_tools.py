@@ -14,7 +14,7 @@ Usage:
     python add_dynamic_meta_tools.py
 """
 
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from sqlmodel import Session, select
 
 from config import load_config
@@ -50,7 +50,7 @@ def register_prompt_creator_tool(database_url: str = None):
     # Define the meta-tool code blob
     tool_code = """from base import ChameleonTool
 from sqlmodel import select
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 import json
 
 class PromptCreatorTool(ChameleonTool):
@@ -242,7 +242,7 @@ def register_resource_creator_tool(database_url: str = None):
     # Define the meta-tool code blob
     tool_code = """from base import ChameleonTool
 from sqlmodel import select
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 import json
 
 class ResourceCreatorTool(ChameleonTool):

@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
 
-from common.utils import compute_hash as _compute_hash
+from common.hash_utils import compute_hash as _compute_hash
 """
 Pytest test suite for runtime.py security features with Jinja2 + SQLAlchemy binding.
 
@@ -71,7 +71,7 @@ def test_basic_select_without_jinja(setup_sales_data):
     session.commit()
     
     # Execute the tool
-    result = execute_tool("test_basic_select", "default", {}, session)
+    result = execute_tool("test_basic_select", "default", {}, session, session)
     
     assert len(result) == 5
 
@@ -111,12 +111,12 @@ GROUP BY department"""
     session.commit()
     
     # Test without filter - should return all departments
-    result_all = execute_tool("test_conditional", "default", {}, session)
+    result_all = execute_tool("test_conditional", "default", {}, session, session)
     assert len(result_all) == 3
     
     # Test with filter - should return only Electronics
     result_filtered = execute_tool("test_conditional", "default", 
-                                  {"department": "Electronics"}, session)
+                                  {"department": "Electronics"}, session, session)
     assert len(result_filtered) == 1
     assert result_filtered[0][0] == "Electronics"
 
@@ -149,7 +149,7 @@ def test_multiple_statements_blocked(setup_sales_data):
     
     # Execute the tool - should raise SecurityError
     with pytest.raises(SecurityError) as exc_info:
-        execute_tool("test_multi_statement", "default", {}, session)
+        execute_tool("test_multi_statement", "default", {}, session, session)
     
     assert "Multiple SQL statements" in str(exc_info.value)
 
@@ -187,7 +187,7 @@ def test_write_operations_blocked(setup_sales_data, sql_code, operation):
     
     # Execute the tool - should raise SecurityError
     with pytest.raises(SecurityError) as exc_info:
-        execute_tool(f"test_{operation.lower()}", "default", {}, session)
+        execute_tool(f"test_{operation.lower()}", "default", {}, session, session)
     
     # Verify it's a SecurityError with some meaningful message
     assert str(exc_info.value)
@@ -222,14 +222,14 @@ def test_parameter_binding_prevents_injection(setup_sales_data):
     # Try SQL injection via parameter (should be safely escaped)
     injection_attempt = "Electronics' OR '1'='1"
     result = execute_tool("test_param_binding", "default", 
-                        {"department": injection_attempt}, session)
+                        {"department": injection_attempt}, session, session)
     
     # Should return empty result (no department matches the literal string)
     assert len(result) == 0
     
     # Normal query should work
     result_normal = execute_tool("test_param_binding", "default", 
-                                {"department": "Electronics"}, session)
+                                {"department": "Electronics"}, session, session)
     assert len(result_normal) > 0
 
 
@@ -260,7 +260,7 @@ def test_trailing_semicolon_allowed(setup_sales_data):
     session.commit()
     
     # Should not raise error
-    result = execute_tool("test_trailing_semicolon", "default", {}, session)
+    result = execute_tool("test_trailing_semicolon", "default", {}, session, session)
     assert len(result) == 3
 
 
@@ -292,7 +292,7 @@ SELECT * FROM sales_per_day LIMIT 3"""
     session.commit()
     
     # Should work fine - comment is before SELECT
-    result = execute_tool("test_multiline_comment", "default", {}, session)
+    result = execute_tool("test_multiline_comment", "default", {}, session, session)
     assert len(result) == 3
 
 
@@ -324,4 +324,4 @@ def test_dangerous_keyword_in_query_body_blocked(setup_sales_data):
     
     # Should be blocked
     with pytest.raises(SecurityError):
-        execute_tool("test_union_update", "default", {}, session)
+        execute_tool("test_union_update", "default", {}, session, session)

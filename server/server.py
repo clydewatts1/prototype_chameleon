@@ -54,7 +54,6 @@ from seed_db import seed_database
 app = Server('chameleon-engine')
 
 # Database engines - initialized in lifespan
-_db_engine = None  # Legacy single engine (for backward compatibility)
 _meta_engine = None  # Metadata engine
 _data_engine = None  # Data engine
 _data_db_connected = False  # Flag indicating if data DB is available
@@ -76,6 +75,11 @@ def setup_logging(log_level: str = "INFO", logs_dir: str = "logs"):
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         logs_dir: Directory path for log files (default: "logs")
     """
+    # Check if root logger is already configured to prevent duplicate handlers/files
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        return
+
     # Create logs directory if it doesn't exist
     logs_path = Path(logs_dir)
     logs_path.mkdir(parents=True, exist_ok=True)
@@ -135,9 +139,9 @@ def setup_logging(log_level: str = "INFO", logs_dir: str = "logs"):
 
 def get_db_engine():
     """Get the database engine instance (legacy - returns metadata engine)."""
-    if _meta_engine is None and _db_engine is None:
+    if _meta_engine is None:
         raise RuntimeError("Database not initialized. Server lifespan not started.")
-    return _meta_engine if _meta_engine is not None else _db_engine
+    return _meta_engine
 
 
 def get_meta_engine():
@@ -160,8 +164,8 @@ def is_data_db_connected():
 @asynccontextmanager
 async def lifespan(server_instance):
     """Initialize database on server startup."""
-    global _db_engine, _meta_engine, _data_engine, _data_db_connected
-    global _database_url, _metadata_database_url, _data_database_url
+    global _meta_engine, _data_engine, _data_db_connected
+    global _metadata_database_url, _data_database_url
     
     # Load URLs from config if not already set by main()
     if _metadata_database_url is None or _data_database_url is None:
@@ -192,9 +196,7 @@ async def lifespan(server_instance):
         logging.warning("Server running in OFFLINE MODE - business data queries will be unavailable")
         logging.warning("Use 'reconnect_db' tool to reconnect at runtime")
     
-    # Set legacy _db_engine for backward compatibility
-    _db_engine = _meta_engine
-    _database_url = _metadata_database_url
+
     
     # Store engines on app instance for access by tools
     app._meta_engine = _meta_engine
