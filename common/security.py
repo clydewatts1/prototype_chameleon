@@ -291,7 +291,8 @@ def load_security_policies(db_session) -> list:
         db_session: SQLModel database session
         
     Returns:
-        List of policy dicts with keys: rule_type, category, pattern, is_active, description
+        List of policy dicts with keys: rule_type, category, pattern, is_active, description.
+        Returns an empty list if SecurityPolicy model is not available (graceful degradation).
         
     Example:
         from sqlmodel import Session
@@ -306,15 +307,9 @@ def load_security_policies(db_session) -> list:
     try:
         # Avoid circular import by importing here
         from sqlmodel import select
-        # Import here to avoid circular dependency at module level
-        import sys
-        import os
         
-        # Add server directory to path if not already there
-        server_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'server')
-        if server_dir not in sys.path:
-            sys.path.insert(0, server_dir)
-        
+        # Import SecurityPolicy - assumes models is in path
+        # (e.g., via sys.path manipulation in tests or server context)
         from models import SecurityPolicy
         
         # Query active policies
@@ -332,6 +327,8 @@ def load_security_policies(db_session) -> list:
             }
             for p in policies
         ]
-    except ImportError:
-        # If models module not available, return empty list (use defaults)
-        return None
+    except (ImportError, AttributeError):
+        # If models module not available or SecurityPolicy doesn't exist,
+        # return empty list to allow graceful degradation
+        # Caller can handle by using hardcoded defaults (policies=None)
+        return []
