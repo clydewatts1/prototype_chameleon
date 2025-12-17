@@ -199,6 +199,33 @@ class MacroRegistry(SQLModel, table=True):
     is_active: bool = Field(default=True, description="Whether the macro is currently active")
 
 
+class SecurityPolicy(SQLModel, table=True):
+    """
+    Table for storing security policies for AST validation.
+    
+    This table enables dynamic security policy management where policies can be
+    updated without code changes. Supports both allow lists (whitelist) and 
+    deny lists (blacklist) with strict precedence: deny always overrides allow.
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        rule_type: Type of rule ('allow' or 'deny')
+        category: Category of restriction ('module', 'function', or 'attribute')
+        pattern: The name to match (e.g., 'subprocess', 'open', 'os.system')
+        description: Optional description of why this policy exists
+        is_active: Whether the policy is currently active (only active policies are enforced)
+    """
+    __tablename__ = _table_config.get('security_policy', 'securitypolicy')
+    __table_args__ = _schema_arg
+    
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    rule_type: str = Field(description="Type of rule: 'allow' or 'deny'")
+    category: str = Field(description="Category: 'module', 'function', or 'attribute'")
+    pattern: str = Field(description="The name to match (e.g., 'subprocess', 'open', 'os.system')")
+    description: str | None = Field(default=None, description="Optional description of the policy")
+    is_active: bool = Field(default=True, description="Whether the policy is currently active")
+
+
 # Database engine setup
 # Usage: engine = get_engine("sqlite:///database.db")
 # For production, replace with appropriate database URL
@@ -218,7 +245,7 @@ def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
 
 
 # Model classification for dual-engine architecture
-METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry]
+METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, SecurityPolicy]
 DATA_MODELS = [SalesPerDay]
 
 

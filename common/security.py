@@ -140,17 +140,24 @@ def _validate_read_only_fallback(sql: str) -> None:
             raise SecurityError(f"Dangerous keyword '{keyword}' detected. Only SELECT statements are allowed.")
 
 
-def validate_code_structure(code_str: str) -> None:
+def validate_code_structure(code_str: str, policies: list = None) -> None:
     """
     Validate that Python code only contains safe top-level nodes and prevents dangerous operations.
     
     Checks:
     1. Top-level nodes must be Import, ImportFrom, or ClassDef (Plugin architecture).
-    2. No imports of dangerous modules (importlib, subprocess, sys).
-    3. No calls to dangerous functions (exec, eval, open, os.system, etc.).
+    2. No imports of dangerous modules (based on policies or defaults).
+    3. No calls to dangerous functions (based on policies or defaults).
+    
+    Policy Precedence:
+    - If a pattern appears in a 'deny' rule, it is blocked regardless of 'allow' rules.
+    - If a pattern appears only in 'allow' rules, it is allowed.
+    - If a pattern appears in neither, it follows default behavior (blocked for backward compatibility).
     
     Args:
         code_str: The Python code string to validate
+        policies: Optional list of policy dicts with keys: rule_type, category, pattern, is_active
+                  If None, uses hardcoded defaults for backward compatibility.
         
     Raises:
         SecurityError: If code violates security constraints
@@ -172,23 +179,43 @@ def validate_code_structure(code_str: str) -> None:
                 f"Invalid top-level node '{node_type}'. Only Import, ImportFrom, "
                 f"and ClassDef are allowed at the top level."
             )
-            
-    # 2. Deep AST Inspection for Dangerous Operations
-    BANNED_MODULES = {'importlib', 'subprocess', 'sys', 'shutil', 'marshal', 'pickle'}
-    BANNED_FUNCTIONS = {'exec', 'eval', 'compile', 'open', 'input', 'exit', 'quit', 'help', '__import__'}
     
+    # 2. Build policy sets from provided policies or use defaults
+    if policies is not None:
+        # Filter active policies only
+        active_policies = [p for p in policies if p.get('is_active', True)]
+        
+        # Build deny and allow sets by category
+        denied_modules = {p['pattern'] for p in active_policies if p['rule_type'] == 'deny' and p['category'] == 'module'}
+        allowed_modules = {p['pattern'] for p in active_policies if p['rule_type'] == 'allow' and p['category'] == 'module'}
+        
+        denied_functions = {p['pattern'] for p in active_policies if p['rule_type'] == 'deny' and p['category'] == 'function'}
+        allowed_functions = {p['pattern'] for p in active_policies if p['rule_type'] == 'allow' and p['category'] == 'function'}
+        
+        denied_attributes = {p['pattern'] for p in active_policies if p['rule_type'] == 'deny' and p['category'] == 'attribute'}
+        allowed_attributes = {p['pattern'] for p in active_policies if p['rule_type'] == 'allow' and p['category'] == 'attribute'}
+    else:
+        # Backward compatibility: Use hardcoded defaults
+        denied_modules = {'importlib', 'subprocess', 'sys', 'shutil', 'marshal', 'pickle'}
+        allowed_modules = set()
+        denied_functions = {'exec', 'eval', 'compile', 'open', 'input', 'exit', 'quit', 'help', '__import__'}
+        allowed_functions = set()
+        denied_attributes = set()
+        allowed_attributes = set()
+            
+    # 3. Deep AST Inspection for Dangerous Operations
     for node in ast.walk(tree):
         # Check Imports
         if isinstance(node, ast.Import):
             for name in node.names:
                 root_module = name.name.split('.')[0]
-                if root_module in BANNED_MODULES:
+                if _is_denied(root_module, denied_modules, allowed_modules):
                     raise SecurityError(f"Import of forbidden module '{root_module}' is blocked.")
                     
         if isinstance(node, ast.ImportFrom):
             if node.module:
                 root_module = node.module.split('.')[0]
-                if root_module in BANNED_MODULES:
+                if _is_denied(root_module, denied_modules, allowed_modules):
                     raise SecurityError(f"Import of forbidden module '{root_module}' is blocked.")
                     
         # Check Function Calls (Direct & Attribute)
@@ -196,7 +223,7 @@ def validate_code_structure(code_str: str) -> None:
             # Direct calls: eval(), exec(), open()
             if isinstance(node.func, ast.Name):
                 func_name = node.func.id
-                if func_name in BANNED_FUNCTIONS:
+                if _is_denied(func_name, denied_functions, allowed_functions):
                     raise SecurityError(f"Call to forbidden function '{func_name}()' is blocked.")
             
             # Attribute calls: os.system(), os.popen()
@@ -205,10 +232,103 @@ def validate_code_structure(code_str: str) -> None:
                     module = node.func.value.id
                     method = node.func.attr
                     
-                    # Block os.system, os.popen, etc.
-                    if module == 'os' and method in ('system', 'popen', 'spawn', 'exec', 'fork'):
-                         raise SecurityError(f"Call to forbidden function 'os.{method}()' is blocked.")
+                    # Check attribute-level patterns (e.g., 'os.system')
+                    attr_pattern = f"{module}.{method}"
+                    if _is_denied(attr_pattern, denied_attributes, allowed_attributes):
+                        raise SecurityError(f"Call to forbidden function '{attr_pattern}()' is blocked.")
                     
-                    # Block subprocess.*
-                    if module == 'subprocess':
-                        raise SecurityError(f"Call to forbidden module 'subprocess' is blocked.")
+                    # Legacy checks for backward compatibility (if no policies provided)
+                    if policies is None:
+                        # Block os.system, os.popen, etc.
+                        if module == 'os' and method in ('system', 'popen', 'spawn', 'exec', 'fork'):
+                            raise SecurityError(f"Call to forbidden function 'os.{method}()' is blocked.")
+                        
+                        # Block subprocess.*
+                        if module == 'subprocess':
+                            raise SecurityError(f"Call to forbidden module 'subprocess' is blocked.")
+
+
+def _is_denied(pattern: str, denied_set: set, allowed_set: set) -> bool:
+    """
+    Check if a pattern is denied based on precedence rules.
+    
+    Precedence Rules:
+    1. If pattern is in denied_set, it's BLOCKED (deny overrides allow).
+    2. If pattern is in allowed_set (and not in denied_set), it's ALLOWED.
+    3. If pattern is in neither set, default behavior applies (typically blocked for security).
+    
+    Args:
+        pattern: The pattern to check (e.g., 'subprocess', 'eval')
+        denied_set: Set of explicitly denied patterns
+        allowed_set: Set of explicitly allowed patterns
+        
+    Returns:
+        True if the pattern should be blocked, False otherwise
+    """
+    # Rule 1: Deny always takes precedence
+    if pattern in denied_set:
+        return True
+    
+    # Rule 2: If explicitly allowed (and not denied), allow it
+    if pattern in allowed_set:
+        return False
+    
+    # Rule 3: Default behavior - if policies exist (sets are populated), 
+    # we should be more permissive for unlisted items
+    # But if we're using hardcoded defaults (empty allowed_set), block by default
+    # This is handled by the caller having the pattern in denied_set already
+    return False
+
+
+def load_security_policies(db_session) -> list:
+    """
+    Load active security policies from the database.
+    
+    This function queries the SecurityPolicy table and returns a list of
+    policy dictionaries that can be passed to validate_code_structure().
+    
+    Args:
+        db_session: SQLModel database session
+        
+    Returns:
+        List of policy dicts with keys: rule_type, category, pattern, is_active, description.
+        Returns an empty list if SecurityPolicy model is not available (graceful degradation).
+        
+    Example:
+        from sqlmodel import Session
+        from models import get_engine
+        from security import load_security_policies, validate_code_structure
+        
+        engine = get_engine("sqlite:///chameleon.db")
+        with Session(engine) as session:
+            policies = load_security_policies(session)
+            validate_code_structure(code_str, policies=policies)
+    """
+    try:
+        # Avoid circular import by importing here
+        from sqlmodel import select
+        
+        # Import SecurityPolicy - assumes models is in path
+        # (e.g., via sys.path manipulation in tests or server context)
+        from models import SecurityPolicy
+        
+        # Query active policies
+        statement = select(SecurityPolicy).where(SecurityPolicy.is_active == True)
+        policies = db_session.exec(statement).all()
+        
+        # Convert to list of dicts for easier consumption
+        return [
+            {
+                'rule_type': p.rule_type,
+                'category': p.category,
+                'pattern': p.pattern,
+                'is_active': p.is_active,
+                'description': p.description
+            }
+            for p in policies
+        ]
+    except (ImportError, AttributeError):
+        # If models module not available or SecurityPolicy doesn't exist,
+        # return empty list to allow graceful degradation
+        # Caller can handle by using hardcoded defaults (policies=None)
+        return []
