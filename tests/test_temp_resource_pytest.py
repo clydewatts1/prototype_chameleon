@@ -108,9 +108,8 @@ def test_create_dynamic_temp_resource(registered_temp_resource_creator):
     TEMP_CODE_VAULT.clear()
     
     # Simple Python code for dynamic resource
+    # Note: ChameleonTool is injected into the namespace by runtime.py, no import needed
     dynamic_code = """
-from base import ChameleonTool
-
 class DynamicResource(ChameleonTool):
     def run(self, arguments):
         return "Dynamic content from code"
@@ -184,9 +183,8 @@ def test_retrieve_dynamic_temp_resource(registered_temp_resource_creator):
     TEMP_CODE_VAULT.clear()
     
     # Create dynamic code
+    # Note: ChameleonTool is injected into the namespace by runtime.py, no import needed
     dynamic_code = """
-from base import ChameleonTool
-
 class TestDynamicResource(ChameleonTool):
     def run(self, arguments):
         return "Generated at runtime: Hello!"

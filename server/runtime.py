@@ -493,7 +493,8 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
     
     # Add temporary resources for this persona
     for key, resource_meta in TEMP_RESOURCE_REGISTRY.items():
-        # Split from right to handle URIs with colons (e.g., "memo://test:default")
+        # Split from right to separate URI from persona in the temp_key format
+        # Example: "http://example.com:8080:default" -> URI="http://example.com:8080", persona="default"
         uri_from_key, resource_persona = key.rsplit(':', 1)
         if resource_persona == persona:
             desc = resource_meta['description']
