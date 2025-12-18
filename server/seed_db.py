@@ -99,6 +99,16 @@ class GreetingTool(ChameleonTool):
         name = arguments.get('name', 'Guest')
         self.log(f"Greeting {name}")
         return f'Hello {name}! I am running from the database.'
+
+    def complete(self, argument, value):
+        if argument != 'name':
+            return []
+        prefix = (value or '').lower()
+        candidates = [
+            'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank',
+            'Grace', 'Heidi', 'Ivan', 'Judy'
+        ]
+        return [c for c in candidates if c.lower().startswith(prefix)]
 """
         greeting_hash = compute_hash(greeting_code)
         

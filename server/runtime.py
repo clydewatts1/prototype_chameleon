@@ -24,7 +24,7 @@ import traceback
 import json
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
-from sqlalchemy import text
+from sqlalchemy import text, inspect as sa_inspect
 from mcp.types import AnyUrl
 from jinja2 import Template
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry
@@ -409,6 +409,147 @@ def execute_tool(
         
         # Re-raise the exception so the client knows it failed
         raise
+
+
+def _complete_sql_column_values(
+    session: Session,
+    column_name: str,
+    value_prefix: str
+) -> list[str]:
+    """
+    Attempt to complete a column by scanning tables and returning distinct values.
+    Uses SQLAlchemy reflection to find a table containing the column, then runs a
+    bound-parameter query to avoid injection.
+    """
+    try:
+        inspector = sa_inspect(session.get_bind())
+    except Exception:
+        return []
+
+    value_prefix = value_prefix or ""
+    tables = inspector.get_table_names()
+    for table_name in tables:
+        try:
+            columns = inspector.get_columns(table_name)
+        except Exception:
+            continue
+        for col in columns:
+            if col.get('name') == column_name:
+                query = text(
+                    f"SELECT DISTINCT {column_name} "
+                    f"FROM {table_name} "
+                    f"WHERE {column_name} LIKE :val_prefix "
+                    f"ORDER BY {column_name} "
+                    f"LIMIT 10"
+                )
+                try:
+                    rows = session.exec(query, params={"val_prefix": f"{value_prefix}%"}).all()
+                except Exception:
+                    return []
+                suggestions = [row[0] for row in rows if row and row[0] is not None]
+                return suggestions
+    return []
+
+
+def get_tool_completion(
+    tool_name: str,
+    argument: str,
+    value: str,
+    persona: str,
+    meta_session: Session,
+    data_session: Session = None
+) -> list[str]:
+    """
+    Provide completion suggestions for a tool argument.
+
+    For python tools, delegates to the tool instance's `complete` method.
+    For SQL tools, attempts to complete column values by reflection.
+    """
+    # Resolve tool (temp first)
+    is_temp_tool = False
+    temp_tool_key = f"{tool_name}:{persona}"
+
+    if temp_tool_key in TEMP_TOOL_REGISTRY:
+        is_temp_tool = True
+        tool_meta = TEMP_TOOL_REGISTRY[temp_tool_key]
+        code_hash = tool_meta['code_hash']
+
+        if code_hash not in TEMP_CODE_VAULT:
+            raise ToolNotFoundError(
+                f"Temporary tool code not found for '{tool_name}'"
+            )
+        code_data = TEMP_CODE_VAULT[code_hash]
+        code_blob = code_data['code_blob']
+        code_type = code_data['code_type']
+    else:
+        statement = select(ToolRegistry).where(
+            ToolRegistry.tool_name == tool_name,
+            ToolRegistry.target_persona == persona
+        )
+        tool = meta_session.exec(statement).first()
+        if not tool:
+            raise ToolNotFoundError(
+                f"Tool '{tool_name}' not found for persona '{persona}'"
+            )
+
+        statement = select(CodeVault).where(CodeVault.hash == tool.active_hash_ref)
+        code_vault = meta_session.exec(statement).first()
+        if not code_vault:
+            raise ToolNotFoundError(
+                f"Code not found for hash '{tool.active_hash_ref}'"
+            )
+
+        computed_hash = compute_hash(code_vault.code_blob)
+        if computed_hash != code_vault.hash:
+            raise SecurityError(
+                f"Hash mismatch! Expected '{code_vault.hash}', "
+                f"got '{computed_hash}'. Code may be corrupted."
+            )
+
+        code_blob = code_vault.code_blob
+        code_type = code_vault.code_type
+
+    if code_type == 'select':
+        # Prefer data_session; fall back to meta_session for metadata tools
+        sessions_to_try = []
+        if data_session is not None:
+            sessions_to_try.append(data_session)
+        if meta_session is not None and meta_session is not data_session:
+            sessions_to_try.append(meta_session)
+
+        for sess in sessions_to_try:
+            suggestions = _complete_sql_column_values(sess, argument, value)
+            if suggestions:
+                return suggestions
+        return []
+
+    # Python path (and other code types defaulting to python-like behavior)
+    validate_code_structure(code_blob)
+    namespace = {'ChameleonTool': ChameleonTool}
+    exec(code_blob, namespace)
+
+    tool_class = None
+    for name, obj in namespace.items():
+        if (inspect.isclass(obj) and
+            issubclass(obj, ChameleonTool) and
+            obj is not ChameleonTool):
+            tool_class = obj
+            break
+
+    if tool_class is None:
+        raise SecurityError(
+            "No class inheriting from ChameleonTool found in the code"
+        )
+
+    context = {
+        'persona': persona,
+        'tool_name': tool_name,
+    }
+    tool_instance = tool_class(meta_session, context, data_session)
+    try:
+        return tool_instance.complete(argument, value)
+    except Exception:
+        return []
 
 
 def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:

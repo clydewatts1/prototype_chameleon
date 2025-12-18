@@ -29,7 +29,8 @@ from mcp.types import (
     Prompt, 
     PromptArgument, 
     GetPromptResult,
-    PromptMessage
+    PromptMessage,
+    Completion
 )
 from sqlmodel import Session, select
 
@@ -42,6 +43,7 @@ from runtime import (
     list_prompts_for_persona,
     get_resource,
     get_prompt,
+    get_tool_completion,
     ToolNotFoundError, 
     SecurityError,
     ResourceNotFoundError,
@@ -327,6 +329,32 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         logging.error(f"Tool not found: {str(e)}")
         error_text = f"Error: {str(e)}"
         return [TextContent(type="text", text=error_text)]
+
+
+@app.completion()
+async def handle_completion(ref: str, argument: str, value: str | None = None) -> list[Completion]:
+    """
+    Provide completion suggestions for tool arguments.
+    """
+    persona = _get_persona_from_context()
+    logging.info(f"Completion request for tool '{ref}', argument '{argument}', persona '{persona}', prefix='{value}'")
+
+    meta_engine = get_meta_engine()
+    data_engine = get_data_engine()
+    suggestions: list[str] = []
+
+    try:
+        with Session(meta_engine) as meta_session:
+            if data_engine is not None:
+                with Session(data_engine) as data_session:
+                    suggestions = get_tool_completion(ref, argument, value or "", persona, meta_session, data_session)
+            else:
+                suggestions = get_tool_completion(ref, argument, value or "", persona, meta_session, None)
+    except Exception as e:
+        logging.error(f"Completion error for tool '{ref}': {e}")
+        return []
+
+    return [Completion(value=s) for s in suggestions]
     
     except SecurityError as e:
         # Security validation failed - return error

@@ -60,3 +60,19 @@ class ChameleonTool(ABC):
             msg: The message to log
         """
         print(f"[ChameleonTool] {msg}")
+
+    def complete(self, argument: str, value: str) -> list[str]:
+        """
+        Provide completion suggestions for a given argument.
+
+        Subclasses can override to supply context-aware completions.
+        Defaults to no suggestions.
+
+        Args:
+            argument: Argument name being completed
+            value: Current value/prefix typed by the user
+
+        Returns:
+            List of suggestion strings
+        """
+        return []
