@@ -17,6 +17,7 @@ Chameleon is an innovative MCP server implementation that stores executable code
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
 - **Code Integrity**: SHA-256 hashing ensures code hasn't been tampered with
 - **Enhanced Security**: AST-based code validation prevents arbitrary top-level code execution
+- **Dual Output Format**: Support for standardized JSON or token-efficient TOON format
 
 ## Architecture
 
@@ -351,6 +352,26 @@ The server implements the MCP protocol and supports:
 - **Get Prompt**: Retrieves and formats a prompt with arguments
 
 Example tool schemas are defined in the database with JSON Schema for validation.
+
+### 7. Output Formats (JSON vs TOON)
+
+Chameleon supports two output formats for tool execution results:
+
+1. **JSON (`json`)**: Standard, human-readable format. Default.
+2. **TOON (`toon`)**: Token-efficient format optimized for LLM context windows.
+
+You can specify the format using the hidden `_format` argument when calling any tool:
+
+```json
+{
+  "name": "get_sales_summary",
+  "arguments": {
+    "_format": "toon"
+  }
+}
+```
+
+If `toon-format` library is installed, the output will be encoded in TOON format. If not installed or if encoding fails, it gracefully falls back to JSON.
 
 ## Creating Custom Tools
 

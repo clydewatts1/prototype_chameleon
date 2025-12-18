@@ -50,6 +50,13 @@ from runtime import (
     PromptNotFoundError
 )
 from seed_db import seed_database
+import json
+from utils import normalize_result
+
+try:
+    from toon_format import encode as toon_encode
+except ImportError:
+    toon_encode = None
 
 
 # Initialize the server
@@ -300,8 +307,11 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
     Raises:
         Exception: If tool execution fails
     """
+    # 1. Extract format preference
+    output_format = arguments.pop('_format', 'json').lower()
+    
     persona = _get_persona_from_context()
-    logging.info(f"Calling tool '{name}' for persona '{persona}' with arguments: {arguments}")
+    logging.info(f"Calling tool '{name}' for persona '{persona}' with arguments: {arguments} (format: {output_format})")
     
     try:
         # Execute the tool with dual sessions
@@ -316,11 +326,22 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
             else:
                 result = execute_tool(name, persona, arguments, meta_session, None)
         
-        # Convert result to string if it's not already
-        if result is None:
-            result_text = "Tool executed successfully (no return value)"
+        # 2. Normalize Data
+        clean_result = normalize_result(result)
+        
+        # 3. Format Output
+        if output_format == 'toon':
+            if toon_encode:
+                try:
+                    result_text = toon_encode(clean_result)
+                except Exception as e:
+                    result_text = f"Error encoding TOON: {e}\n{json.dumps(clean_result, default=str)}"
+            else:
+                result_text = "Error: toon-format library not installed."
+        elif output_format == 'json':
+            result_text = json.dumps(clean_result, indent=2, default=str, ensure_ascii=False)
         else:
-            result_text = str(result)
+            result_text = str(clean_result)
         
         logging.info(f"Tool '{name}' executed successfully")
         # Wrap in TextContent and return
@@ -330,6 +351,18 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextCon
         # Tool not found - return helpful error message
         logging.error(f"Tool not found: {str(e)}")
         error_text = f"Error: {str(e)}"
+        return [TextContent(type="text", text=error_text)]
+    
+    except SecurityError as e:
+        # Security validation failed - return error
+        logging.error(f"Security error executing tool '{name}': {str(e)}")
+        error_text = f"Security Error: {str(e)}"
+        return [TextContent(type="text", text=error_text)]
+    
+    except Exception as e:
+        # Unexpected error - return generic error message
+        logging.error(f"Unexpected error executing tool '{name}': {str(e)}", exc_info=True)
+        error_text = f"Unexpected error executing tool '{name}': {str(e)}"
         return [TextContent(type="text", text=error_text)]
 
 
@@ -358,17 +391,7 @@ async def handle_completion(ref: str, argument: str, value: str | None = None) -
 
     return [Completion(value=s) for s in suggestions]
     
-    except SecurityError as e:
-        # Security validation failed - return error
-        logging.error(f"Security error executing tool '{name}': {str(e)}")
-        error_text = f"Security Error: {str(e)}"
-        return [TextContent(type="text", text=error_text)]
-    
-    except Exception as e:
-        # Unexpected error - return generic error message
-        logging.error(f"Unexpected error executing tool '{name}': {str(e)}", exc_info=True)
-        error_text = f"Unexpected error executing tool '{name}': {str(e)}"
-        return [TextContent(type="text", text=error_text)]
+
 
 
 @app.list_resources()
