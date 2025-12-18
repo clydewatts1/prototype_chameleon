@@ -18,7 +18,7 @@ from sqlmodel import select, text
 from sqlalchemy import inspect
 from models import CodeVault, ToolRegistry, SalesPerDay
 from runtime import execute_tool
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 
 
 @pytest.fixture

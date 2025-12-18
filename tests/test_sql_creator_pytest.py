@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
 
-from common.utils import compute_hash as _compute_hash
+from common.hash_utils import compute_hash as _compute_hash
 """
 Pytest test suite for the SQL Creator Meta-Tool.
 
@@ -211,6 +211,7 @@ def test_execute_created_sql_tool(registered_meta_tool):
         'get_test_sales',
         'default',
         {'store_name': 'Test Store'},
+        session,
         session
     )
     

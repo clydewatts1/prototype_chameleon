@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-from common.utils import compute_hash
+from common.hash_utils import compute_hash
 from datetime import date, timedelta
 from sqlmodel import Session, select
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
