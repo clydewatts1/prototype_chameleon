@@ -1,7 +1,25 @@
+# Chameleon MCP Server🦎
+**A Dynamic, Self-Modifying MCP Server & AI Debugger**
+
+Prototype Chameleon is an advanced Model Context Protocol (MCP) implementation that shifts tool management from static files to a database-backed registry. It is designed to empower autonomous AI agents with the ability to evolve their capabilities at runtime while maintaining strict security standards.
+
+**Key Features:**
+* **🧠 Self-Modifying Architecture:** LLMs can dynamically create new SQL tools via a meta-tool, using Jinja2 templates for structure and SQLAlchemy for secure parameter binding.
+* **❤️‍🩹 AI Self-Healing:** Implements a "Black Box" recorder pattern that captures full Python tracebacks during failures, allowing agents to diagnose bugs and patch their own tools.
+* **🗄️ Database Agnostic:** Built on SQLModel and SQLAlchemy, enabling seamless deployment on SQLite (default), PostgreSQL, MySQL, or any other supported backend without code changes.
+* **📊 Generative UI:** Includes a "Chameleon UI" feature that enables LLMs to write and host interactive Streamlit dashboards on demand.
+* **🛡️ Secure Execution:** Features a custom runtime with AST-based code validation, hash integrity checks, and persona-based tool filtering.
+* **🐞 AI Debugger:** A built-in Streamlit client that connects via stdio to inspect protocol messages and interactively debug server tools.
+
 # Prototype Chameleon - MCP Server and AI Debugger
 
 This repository contains a Model Context Protocol (MCP) server implementation and an AI-powered debugging client.
 
+
+> 🚧 **Project Status: Alpha**
+> This project is currently in Alpha. APIs may change, and "self-modifying" features should be used in controlled environments.
+
+Prototype Chameleon is an advanced Model Context Protocol (MCP) implementation...
 ## Repository Structure
 
 ```
