@@ -9,6 +9,7 @@ Prototype Chameleon is an advanced Model Context Protocol (MCP) implementation t
 * **🗄️ Database Agnostic:** Built on SQLModel and SQLAlchemy, enabling seamless deployment on SQLite (default), PostgreSQL, MySQL, or any other supported backend without code changes.
 * **📊 Generative UI:** Includes a "Chameleon UI" feature that enables LLMs to write and host interactive Streamlit dashboards on demand.
 * **🛡️ Secure Execution:** Features a custom runtime with AST-based code validation, hash integrity checks, and persona-based tool filtering.
+* **📂 Group Organization:** Tools, resources, and prompts are organized into logical groups (e.g., `utility`, `system`) with automatic namespacing.
 * **🐞 AI Debugger:** A built-in Streamlit client that connects via stdio to inspect protocol messages and interactively debug server tools.
 
 # Prototype Chameleon - MCP Server and AI Debugger

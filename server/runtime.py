@@ -559,22 +559,27 @@ def get_tool_completion(
         return []
 
 
-def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+def list_tools_for_persona(persona: str, db_session: Session, group: str = None) -> List[Dict[str, Any]]:
     """
     List all available tools for a specific persona, including temporary test tools.
     
     Args:
         persona: The persona/context to filter tools by
         db_session: SQLModel Session for database access
+        group: Optional group/category filter
         
     Returns:
         List of dictionaries containing tool information:
         - name: Tool name
         - description: Tool description
         - input_schema: JSON schema for tool arguments
+        - group: Tool group
     """
-    statement = select(ToolRegistry).where(ToolRegistry.target_persona == persona)
-    tools = db_session.exec(statement).all()
+    query = select(ToolRegistry).where(ToolRegistry.target_persona == persona)
+    if group:
+        query = query.where(ToolRegistry.group == group)
+    
+    tools = db_session.exec(query).all()
     
     results = []
     for tool in tools:
@@ -586,6 +591,7 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
             'name': tool.tool_name,
             'description': desc,
             'input_schema': tool.input_schema,
+            'group': tool.group or 'general',
         })
     
     # Add temporary tools for this persona
@@ -604,13 +610,14 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
     return results
 
 
-def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+def list_resources_for_persona(persona: str, db_session: Session, group: str = None) -> List[Dict[str, Any]]:
     """
     List all available resources for a specific persona, including temporary resources.
     
     Args:
         persona: The persona/context to filter resources by
         db_session: SQLModel Session for database access
+        group: Optional group/category filter
         
     Returns:
         List of dictionaries containing resource information:
@@ -618,9 +625,13 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
         - name: Resource name
         - description: Resource description
         - mimeType: MIME type from database
+        - group: Resource group
     """
-    statement = select(ResourceRegistry).where(ResourceRegistry.target_persona == persona)
-    resources = db_session.exec(statement).all()
+    query = select(ResourceRegistry).where(ResourceRegistry.target_persona == persona)
+    if group:
+        query = query.where(ResourceRegistry.group == group)
+        
+    resources = db_session.exec(query).all()
     
     results = [
         {
@@ -628,6 +639,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
             'name': resource.name,
             'description': resource.description,
             'mimeType': resource.mime_type,
+            'group': resource.group or 'general',
         }
         for resource in resources
     ]

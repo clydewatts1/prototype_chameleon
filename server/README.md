@@ -17,9 +17,15 @@ Chameleon is an innovative MCP server implementation that stores executable code
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
 - **Code Integrity**: SHA-256 hashing ensures code hasn't been tampered with
 - **Enhanced Security**: AST-based code validation prevents arbitrary top-level code execution
+- **Use Groups**: Organize tools into logical groups (e.g., `utility`, `math`, `system`)
 - **Dual Output Format**: Support for standardized JSON or token-efficient TOON format
 
+## Data Model
+
+For a detailed Entity Relationship Diagram (ERD) and full schema documentation, see [DATA_MODEL.md](DATA_MODEL.md).
+
 ## Architecture
+
 
 The project consists of the following main components:
 
@@ -31,7 +37,7 @@ The project consists of the following main components:
 
 2. **models.py**: Database schema using SQLModel
    - `CodeVault`: Stores executable code with SHA-256 hash as primary key
-   - `ToolRegistry`: Maps tools to personas with JSON schema definitions
+   - `ToolRegistry`: Maps tools to personas with JSON schema definitions. Includes `group` for organization.
    - `ResourceRegistry`: Defines resources with static or dynamic content
    - `PromptRegistry`: Stores prompt templates with argument schemas
 
@@ -221,6 +227,7 @@ The YAML file format (`specs.yaml`):
 tools:
   - name: greet
     persona: default
+    group: utility  # REQUIRED: logical group
     description: Greets a person by name
     code_type: python
     code: |
@@ -237,15 +244,19 @@ tools:
           type: string
       required: [name]
 
+# Note: The loader will automatically save this as 'utility_greet'
+
 resources:
   - uri: memo://welcome
     name: welcome_message
+    group: general  # REQUIRED
     persona: default
     is_dynamic: false
     static_content: "Welcome message here"
 
 prompts:
   - name: review_code
+    group: developer  # REQUIRED
     description: Code review prompt
     template: "Review this code: {code}"
     arguments_schema:
@@ -544,6 +555,7 @@ tools:
   - name: my_tool
     persona: default
     description: My custom Python tool
+    group: examples
     code_type: python  # Optional, defaults to 'python'
     code: |
       from base import ChameleonTool

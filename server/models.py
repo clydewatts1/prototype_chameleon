@@ -98,6 +98,7 @@ class ToolRegistry(SQLModel, table=True):
         description="Reference to CodeVault hash"
     )
     is_auto_created: bool = Field(default=False, description="True if tool was created by the LLM, False if system/prebuilt")
+    group: str = Field(description="Group/Category for organization")
 
 
 class ResourceRegistry(SQLModel, table=True):
@@ -125,6 +126,7 @@ class ResourceRegistry(SQLModel, table=True):
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the resource")
+    group: str = Field(description="Group/Category for organization")
 
 
 class PromptRegistry(SQLModel, table=True):
@@ -142,6 +144,7 @@ class PromptRegistry(SQLModel, table=True):
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the prompt")
+    group: str = Field(description="Group/Category for organization")
 
 
 class ExecutionLog(SQLModel, table=True):

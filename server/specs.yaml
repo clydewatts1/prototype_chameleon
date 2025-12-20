@@ -5,6 +5,7 @@ tools:
   # Python class-based tool example
   - name: greet
     persona: default
+    group: utility
     description: Greets a person by name using class-based architecture
     code_type: python
     code: |
@@ -37,6 +38,7 @@ tools:
   # Another Python tool - calculator
   - name: add
     persona: default
+    group: math
     description: Add two numbers together
     code_type: python
     code: |
@@ -64,6 +66,7 @@ tools:
   # SQL-based tool example
   - name: list_all_tools
     persona: default
+    group: database
     description: Lists all available tools in the registry using SQL
     code_type: select
     code: |
@@ -83,6 +86,7 @@ resources:
   - uri: memo://welcome
     name: welcome_message
     persona: default
+    group: general
     description: A static welcome message for the Chameleon MCP server
     mime_type: text/plain
     is_dynamic: false
@@ -102,6 +106,7 @@ resources:
   - uri: system://time
     name: server_time
     persona: default
+    group: system
     description: Returns the current server time dynamically
     mime_type: text/plain
     is_dynamic: true
@@ -120,6 +125,7 @@ prompts:
   # Prompt example
   - name: review_code
     persona: default
+    group: developer
     description: Generates a code review request prompt
     template: |
       Please review the following code:
