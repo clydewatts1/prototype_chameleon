@@ -12,8 +12,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.hash_utils import compute_hash
 from datetime import date, timedelta
 from sqlmodel import Session, select
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
+from common.hash_utils import compute_hash
+from datetime import date, timedelta
+from sqlmodel import Session, select
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, IconRegistry, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
 from config import load_config
+import base64
+import random
+import io
+
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    Image = None
+    ImageDraw = None
 
 
 
@@ -27,10 +39,61 @@ def _clear_metadata_database(session: Session) -> None:
     """
     # Delete in order of dependencies
     session.exec(ToolRegistry.__table__.delete())
+    session.exec(IconRegistry.__table__.delete())
     session.exec(ResourceRegistry.__table__.delete())
     session.exec(PromptRegistry.__table__.delete())
     session.exec(CodeVault.__table__.delete())
+    session.exec(SalesPerDay.__table__.delete())
     session.commit()
+
+
+def _generate_leopard_icon() -> tuple[str, str]:
+    """
+    Generate a default 'Leopard Chameleon' icon using Pillow.
+    
+    Returns:
+        tuple: (mime_type, base64_content)
+    """
+    if not Image:
+        print("⚠️  Pillow not installed, skipping icon generation")
+        return "image/png", ""
+
+    # Canvas settings
+    width, height = 256, 256
+    bg_color = (60, 179, 113)  # Medium Sea Green
+    
+    # Create image
+    img = Image.new('RGB', (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+    
+    # Draw leopard spots
+    for _ in range(30):
+        # Random position
+        x = random.randint(20, width - 20)
+        y = random.randint(20, height - 20)
+        
+        # Random size for the spot base
+        r = random.randint(10, 30)
+        
+        # Spot color (dark brown/black)
+        spot_color = (random.randint(30, 60), random.randint(20, 40), random.randint(10, 30))
+        
+        # Draw irregular circle (simple approximation using ellipse)
+        draw.ellipse([x-r, y-r, x+r, y+r], fill=spot_color)
+        
+        # Draw lighter center for some spots ("rosette" look)
+        if random.random() > 0.5:
+            center_r =  int(r * 0.4)
+            center_color = (random.randint(100, 150), random.randint(80, 120), random.randint(40, 80))
+            draw.ellipse([x-center_r, y-center_r, x+center_r, y+center_r], fill=center_color)
+
+    # Convert to base64
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    return "image/png", img_str
+
 
 
 def _clear_data_database(session: Session) -> None:
@@ -89,8 +152,27 @@ def seed_database(metadata_database_url: str = None, data_database_url: str = No
             if existing_tools:
                 print("\n⚠️  Clearing existing metadata...")
                 _clear_metadata_database(session)
+                _clear_metadata_database(session)
                 print("✅ Metadata cleared")
         
+        # Check/Create Default Icon
+        existing_icon = session.exec(select(IconRegistry).where(IconRegistry.icon_name == "default_chameleon")).first()
+        if not existing_icon:
+            print("\n[0] Generating default 'Leopard Chameleon' icon...")
+            mime_type, content = _generate_leopard_icon()
+            if content:
+                default_icon = IconRegistry(
+                    icon_name="default_chameleon",
+                    mime_type=mime_type,
+                    content=content
+                )
+                session.add(default_icon)
+                print("   OK Icon 'default_chameleon' generated and saved")
+            else:
+                print("   ⚠️  Skipped icon generation (dependencies missing)")
+        else:
+            print("\n[0] Default icon 'default_chameleon' already exists")
+
         # Sample Tool 1: Greeting function
         greeting_code = """from base import ChameleonTool
 

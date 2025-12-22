@@ -35,8 +35,10 @@ from mcp.types import (
 from sqlmodel import Session, select
 
 from config import load_config
-from models import get_engine, create_db_and_tables, ToolRegistry, METADATA_MODELS, DATA_MODELS
+from config import load_config
+from models import get_engine, create_db_and_tables, ToolRegistry, IconRegistry, METADATA_MODELS, DATA_MODELS
 from runtime import (
+    execute_tool,
     execute_tool, 
     list_tools_for_persona, 
     list_resources_for_persona,
@@ -51,6 +53,7 @@ from runtime import (
 )
 from seed_db import seed_database
 import json
+import base64
 from utils import normalize_result
 
 try:
@@ -281,11 +284,66 @@ async def handle_list_tools() -> list[Tool]:
     # Convert to MCP Tool objects
     tools = []
     for tool_data in tools_data:
+        if tool_data.get('icon_name'):
+            # Fetch specific icon
+            icon_obj = session.exec(select(IconRegistry).where(IconRegistry.icon_name == tool_data['icon_name'])).first()
+        else:
+            # Fallback to default
+            icon_obj = session.exec(select(IconRegistry).where(IconRegistry.icon_name == "default_chameleon")).first()
+        
+        # Format icons list if icon found
+        tool_icons = None
+        if icon_obj and icon_obj.content:
+            # Construct data URI
+            if icon_obj.mime_type == 'image/svg+xml':
+                # For SVG, valid to just use the content if it's text, but base64 is safer for transport
+                # If content already starts with 'data:', use it as is
+                if icon_obj.content.startswith('data:'):
+                    src = icon_obj.content
+                else:
+                    # Check if it's base64 already or raw XML. 
+                    # Heuristic: SVGs start with <, base64 usually doesn't (unless it's a very fresh coincindence)
+                    if icon_obj.content.strip().startswith('<'):
+                        # It's raw XML, encode it
+                        b64_content = base64.b64encode(icon_obj.content.encode('utf-8')).decode('utf-8')
+                        src = f"data:image/svg+xml;base64,{b64_content}"
+                    else:
+                        # Assume already base64
+                        src = f"data:image/svg+xml;base64,{icon_obj.content}"
+            else:
+                 # PNG or other
+                 if icon_obj.content.startswith('data:'):
+                     src = icon_obj.content
+                 else:
+                     src = f"data:{icon_obj.mime_type};base64,{icon_obj.content}"
+                     
+            tool_icons = [{"src": src, "mimeType": icon_obj.mime_type}]
+
         tool = Tool(
             name=tool_data['name'],
             description=tool_data['description'],
             inputSchema=tool_data['input_schema']
         )
+        # Manually inject icons field since it might not be in the mcp.types.Tool definition yet depending on version,
+        # but the JSON serialization will handle it if we add it to the object's __dict__ or if we're careful.
+        # Actually, mcp.types.Tool is a Pydantic model. We should check if it supports 'icons'.
+        # If the installed SDK version supports it, we just pass it to constructor. 
+        # For safety/compatibility let's try to pass it to constructor, catching TypeError if not supported.
+        try:
+             tool = Tool(
+                name=tool_data['name'],
+                description=tool_data['description'],
+                inputSchema=tool_data['input_schema'],
+                icons=tool_icons
+            )
+        except TypeError:
+             # Fallback for older SDKs: standard tool without icons
+             tool = Tool(
+                name=tool_data['name'],
+                description=tool_data['description'],
+                inputSchema=tool_data['input_schema']
+            )
+
         tools.append(tool)
     
     logging.info(f"Returning {len(tools)} tool(s) for persona: {persona}")
@@ -478,6 +536,38 @@ async def handle_read_resource(uri: str) -> list[ReadResourceContents]:
         # Unexpected error
         logging.error(f"Unexpected error reading resource '{uri}': {str(e)}", exc_info=True)
         raise ValueError(f"Unexpected error reading resource '{uri}': {str(e)}")
+
+
+@app.read_resource()
+async def handle_list_icons_resource(uri: str) -> list[ReadResourceContents]:
+    """
+    Special handler for icons://list resource.
+    Returns a JSON list of all available icons.
+    """
+    if uri != "icons://list":
+        return None
+        
+    logging.info("Listing all icons via icons://list")
+    
+    meta_engine = get_meta_engine()
+    with Session(meta_engine) as session:
+        icons = session.exec(select(IconRegistry)).all()
+        
+        icon_list = []
+        for icon in icons:
+            icon_list.append({
+                "name": icon.icon_name,
+                "mime_type": icon.mime_type,
+                "preview": f"(Base64 data length: {len(icon.content)})"
+            })
+            
+        return [
+            ReadResourceContents(
+                content=json.dumps(icon_list, indent=2),
+                mime_type="application/json"
+            )
+        ]
+
 
 
 @app.list_prompts()

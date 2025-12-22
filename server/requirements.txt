@@ -24,3 +24,6 @@ pytest>=8.0.0
 
 # Data formatting
 toon-format>=1.0.0
+
+# Image processing for Icons
+Pillow>=10.2.0
