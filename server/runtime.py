@@ -402,6 +402,23 @@ def execute_tool(
             
             return result
             
+    except SecurityError:
+        # Re-raise security errors so they are not swallowed by the Smart Error Wrapper
+        # We still log them for the record
+        full_traceback = traceback.format_exc()
+        try:
+            log_execution(
+                tool_name=tool_name,
+                persona=persona,
+                arguments=arguments,
+                status="FAILURE",
+                error_traceback_str=full_traceback,
+                db_session=meta_session
+            )
+        except Exception:
+            pass # Best effort logging
+        raise
+
     except Exception as e:
         # --- SMART ERROR WRAPPER ---
         # 1. Log full failure for Admin

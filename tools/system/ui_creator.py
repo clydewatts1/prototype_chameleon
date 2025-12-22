@@ -118,7 +118,8 @@ class UiCreatorTool(ChameleonTool):
                     description=f"Streamlit dashboard: {dashboard_name}",
                     input_schema=input_schema,
                     active_hash_ref=code_hash,
-                    is_auto_created=True
+                    is_auto_created=True,
+                    group='visualization'
                 )
                 self.meta_session.add(tool)
                 self.log(f"Dashboard '{dashboard_name}' created in ToolRegistry")

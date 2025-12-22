@@ -129,7 +129,8 @@ def register_temp_tool_creator(database_url: str = None):
                     target_persona='default',
                     description="Create a temporary SQL-based test tool (not persisted, auto LIMIT 3)",
                     input_schema=input_schema,
-                    active_hash_ref=tool_hash
+                    active_hash_ref=tool_hash,
+                    group='system'
                 )
                 session.add(tool)
                 print(f"   ✅ Meta-tool 'create_temp_test_tool' created")

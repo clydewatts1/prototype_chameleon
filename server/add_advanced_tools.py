@@ -227,6 +227,7 @@ def register_execute_ddl_tool(session, config):
     tool_code = """from base import ChameleonTool
 from sqlalchemy import text
 import re
+from common.security import SecurityError
 
 class ExecuteDDLTool(ChameleonTool):
     def run(self, arguments):
@@ -275,7 +276,7 @@ class ExecuteDDLTool(ChameleonTool):
         # Additional security: prevent multiple statements
         sql_stripped = ddl_command.rstrip().rstrip(';').rstrip()
         if ';' in sql_stripped:
-            raise ValueError(
+            raise SecurityError(
                 "Multiple SQL statements detected. Only single DDL statements are allowed."
             )
         
