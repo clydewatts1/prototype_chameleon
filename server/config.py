@@ -43,7 +43,10 @@ def get_default_config() -> Dict[str, Any]:
             'resource_registry': 'resourceregistry',
             'prompt_registry': 'promptregistry',
             'sales_per_day': 'sales_per_day',
-            'execution_log': 'executionlog'
+            'execution_log': 'executionlog',
+            'icon_registry': 'iconregistry',
+            'macro_registry': 'macroregistry',
+            'security_policy': 'securitypolicy'
         },
         'features': {
             'chameleon_ui': {
@@ -67,8 +70,13 @@ def load_config() -> Dict[str, Any]:
     # Get default configuration
     config = get_default_config()
     
-    # Construct config file path
-    config_path = Path(os.path.expanduser('~/.chameleon/config/config.yaml'))
+    # Prioritize local config file (in current directory)
+    local_config_path = Path("config.yaml")  
+    if local_config_path.exists():
+        config_path = local_config_path
+    else:
+        # Fallback to system config
+        config_path = Path(os.path.expanduser('~/.chameleon/config/config.yaml'))
     
     # If config file doesn't exist, return defaults
     if not config_path.exists():

@@ -213,6 +213,7 @@ def execute_tool(
         SecurityError: If hash validation fails
         RuntimeError: If data database is required but not available
     """
+    tool_def = None
     try:
         # Check if this is a temporary tool first
         is_temp_tool = False
@@ -239,6 +240,7 @@ def execute_tool(
                 ToolRegistry.target_persona == persona
             )
             tool = meta_session.exec(statement).first()
+            tool_def = tool
             
             if not tool:
                 raise ToolNotFoundError(
@@ -401,21 +403,51 @@ def execute_tool(
             return result
             
     except Exception as e:
-        # Capture the full traceback
-        error_traceback_str = traceback.format_exc()
-        
-        # Log failure (to metadata DB)
+        # --- SMART ERROR WRAPPER ---
+        # 1. Log full failure for Admin
+        full_traceback = traceback.format_exc()
         log_execution(
             tool_name=tool_name,
             persona=persona,
             arguments=arguments,
             status="FAILURE",
-            error_traceback_str=error_traceback_str,
+            error_traceback_str=full_traceback,
             db_session=meta_session
         )
         
-        # Re-raise the exception so the client knows it failed
-        raise
+        # 2. Fetch Manual
+        # tool_def should be available from the successfully found tool scope
+        # If tool_def is None (e.g. temp tool or tool not found), manual is empty
+        manual = {}
+        if tool_def and hasattr(tool_def, 'extended_metadata'):
+             manual = tool_def.extended_metadata or {}
+        
+        # 3. Construct Helpful Error
+        error_msg = f"Tool '{tool_name}' failed with error: {str(e)}"
+        
+        if manual:
+            # RISK 1 FIX: Context Explosion Protection
+            # We only grab specific helpful sections, not the whole blob
+            helpful_subset = {
+                "usage_guide": manual.get("usage_guide", "No guide available."),
+                # Only show top 2 examples to save tokens
+                "examples": manual.get("examples", [])[:2],
+                "common_pitfalls": manual.get("pitfalls", [])
+            }
+            
+            manual_str = json.dumps(helpful_subset, indent=2)
+            
+            # Hard limit on characters just in case
+            if len(manual_str) > 1500:
+                manual_str = manual_str[:1500] + "\n... (truncated, use 'system_inspect_tool' for more)"
+
+            error_msg += (
+                "\n\n--- 🛡️ AUTOMATIC HELP SYSTEM ---\n"
+                f"I found the manual for '{tool_name}'. Please use this to correct your request:\n"
+                f"{manual_str}"
+            )
+        
+        return error_msg
 
 
 def _complete_sql_column_values(

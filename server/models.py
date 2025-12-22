@@ -110,6 +110,11 @@ class ToolRegistry(SQLModel, table=True):
         nullable=True,
         description="Reference to IconRegistry icon_name"
     )
+    extended_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="Extended metadata for the tool (manual, examples, usage guide)"
+    )
 
 
 class ResourceRegistry(SQLModel, table=True):
