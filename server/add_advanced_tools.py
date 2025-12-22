@@ -204,7 +204,8 @@ WHEN NOT MATCHED THEN
             target_persona='default',
             description="Upsert data (Insert or Update) based on a key column. Supports SQLite, PostgreSQL, and standard SQL dialects.",
             input_schema=input_schema,
-            active_hash_ref=tool_hash
+            active_hash_ref=tool_hash,
+            group='data'
         )
         session.add(tool)
         print(f"   ✅ Tool 'general_merge_tool' created")
@@ -345,7 +346,8 @@ class ExecuteDDLTool(ChameleonTool):
             target_persona='default',
             description="Execute DDL commands (CREATE, ALTER, DROP, TRUNCATE) with safety checks. Requires explicit confirmation.",
             input_schema=input_schema,
-            active_hash_ref=tool_hash
+            active_hash_ref=tool_hash,
+            group='data'
         )
         session.add(tool)
         print(f"   ✅ Tool 'execute_ddl_tool' created")

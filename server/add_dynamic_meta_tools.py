@@ -199,7 +199,8 @@ class PromptCreatorTool(ChameleonTool):
                     target_persona='default',
                     description="Create or update a prompt in the PromptRegistry",
                     input_schema=input_schema,
-                    active_hash_ref=tool_hash
+                    active_hash_ref=tool_hash,
+                    group='system'
                 )
                 session.add(tool)
                 print(f"   ✅ Meta-tool 'create_new_prompt' created")
@@ -398,7 +399,8 @@ class ResourceCreatorTool(ChameleonTool):
                     target_persona='default',
                     description="Create or update a STATIC resource in the ResourceRegistry",
                     input_schema=input_schema,
-                    active_hash_ref=tool_hash
+                    active_hash_ref=tool_hash,
+                    group='system'
                 )
                 session.add(tool)
                 print(f"   ✅ Meta-tool 'create_new_resource' created")
