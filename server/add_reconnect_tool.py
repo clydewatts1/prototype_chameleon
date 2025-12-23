@@ -153,7 +153,18 @@ class ReconnectDbTool(ChameleonTool):
                     "required": []
                 },
                 active_hash_ref=reconnect_hash,
-                is_auto_created=False
+                is_auto_created=False,
+                group="system",
+                extended_metadata={
+                    "usage_guide": "Use this tool to reconnect to the database if it goes offline.",
+                    "examples": [
+                        {
+                            "input": {},
+                            "expected_output_summary": "Successfully reconnected",
+                            "verified": False
+                        }
+                    ]
+                }
             )
             session.add(reconnect_tool)
             print(f"   ✅ Tool 'reconnect_db' registered")
