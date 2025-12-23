@@ -154,9 +154,9 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 
-engine = get_engine("sqlite:///chameleon.db")
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
 
-with Session(engine) as session:
+with Session(meta_engine) as session:
     # Create new tool via meta-tool
     result = execute_tool(
         "create_new_sql_tool",
