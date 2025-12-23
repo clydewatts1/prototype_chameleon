@@ -385,9 +385,19 @@ def execute_tool(
                 )
             
             # Step 4: Instantiate the tool with sessions and context
+            # Define sub_executor for nested tool calls (used by ChainTool)
+            def sub_executor(sub_tool_name: str, sub_arguments: Dict[str, Any]) -> Any:
+                """
+                Execute a sub-tool within the context of another tool.
+                This enables tools like ChainTool to call other tools.
+                Safe from infinite recursion due to DAG validation.
+                """
+                return execute_tool(sub_tool_name, persona, sub_arguments, meta_session, data_session)
+            
             context = {
                 'persona': persona,
                 'tool_name': tool_name,
+                'executor': sub_executor,
             }
             tool_instance = tool_class(meta_session, context, data_session)
             
