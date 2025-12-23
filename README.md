@@ -48,12 +48,14 @@ prototype_chameleon/
 cd server
 pip install -r requirements.txt
 
-# Initialize the database
-python seed_db.py
-
-# Run the server
+# Run the server (database auto-seeds on first run)
 python server.py
+
+# Optional: Load custom tools from YAML
+python load_specs.py specs.yaml
 ```
+
+**Note:** The server automatically initializes and seeds the database on first run. You no longer need to manually run `seed_db.py` unless you want to reset to defaults.
 
 See [server/README.md](server/README.md) for detailed server documentation.
 
@@ -219,7 +221,25 @@ See [server/EXECUTION_LOG_README.md](server/EXECUTION_LOG_README.md) for complet
        │                                                  │
        │              stdio/JSON-RPC                      │
        └──────────────────────────────────────────────────┘
+                                                          │
+                                    ┌─────────────────────┴─────────────────────┐
+                                    │                                           │
+                              ┌─────▼──────┐                           ┌───────▼────────┐
+                              │ Metadata   │                           │  Data Database │
+                              │  Database  │                           │   (Optional)   │
+                              │            │                           │                │
+                              │  Tools     │                           │ Business Data  │
+                              │  Resources │                           │ sales_per_day  │
+                              │  Prompts   │                           │      etc.      │
+                              │  Code      │                           │                │
+                              └────────────┘                           └────────────────┘
 ```
+
+**Dual Database Design:**
+- **Metadata Database**: Stores all server configuration, tools, and code (required)
+- **Data Database**: Stores business/application data (optional, offline mode available)
+
+For a detailed flow chart, see [server/SERVER_FLOW_CHART.md](server/SERVER_FLOW_CHART.md)
 
 ## Contributing
 

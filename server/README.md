@@ -27,6 +27,10 @@ Chameleon is an innovative MCP server implementation that stores executable code
 
 For a detailed Entity Relationship Diagram (ERD) and full schema documentation, see [DATA_MODEL.md](DATA_MODEL.md).
 
+## Server Flow
+
+For a comprehensive visual flow chart showing how the server operates from initialization through request handling, see [SERVER_FLOW_CHART.md](SERVER_FLOW_CHART.md).
+
 ## Architecture
 
 
@@ -129,8 +133,11 @@ server:
   log_level: "INFO"   # DEBUG, INFO, WARNING, ERROR, or CRITICAL
   logs_dir: "logs"    # Directory for log files (relative or absolute path)
 
-database:
-  url: "sqlite:///chameleon.db"  # Database connection URL
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"  # Metadata database (tools, resources, prompts)
+  
+data_database:
+  url: "sqlite:///chameleon_data.db"  # Data database (business data, optional)
 ```
 
 **Default Behavior:**
@@ -141,7 +148,8 @@ If no config file exists, the server uses these defaults:
 - Port: 8000
 - Log Level: INFO
 - Logs Directory: logs
-- Database: sqlite:///chameleon.db
+- Metadata Database: sqlite:///chameleon_meta.db
+- Data Database: sqlite:///chameleon_data.db
 
 **Command-Line Overrides:**
 
@@ -151,8 +159,11 @@ You can override any config value using command-line arguments:
 # Override transport and port
 python server.py --transport sse --port 9000
 
-# Override database URL
-python server.py --database-url postgresql://user:pass@localhost/mydb
+# Override metadata database URL
+python server.py --metadata-database-url postgresql://user:pass@localhost/mydb_meta
+
+# Override data database URL
+python server.py --data-database-url postgresql://user:pass@localhost/mydb_data
 
 # Override log level
 python server.py --log-level DEBUG
@@ -165,6 +176,12 @@ python server.py --help
 ```
 
 **Priority:** Command-line arguments > YAML config > Defaults
+
+**Dual Database Architecture:**
+
+The server uses two separate databases:
+- **Metadata Database** (required): Stores all server configuration, tools, resources, prompts, and executable code
+- **Data Database** (optional): Stores business/application data. The server can operate in "offline mode" if this database is unavailable, with the `reconnect_db` tool available for runtime reconnection
 
 ### 2. Run the MCP Server
 
@@ -1396,19 +1413,35 @@ with Session(engine) as session:
 
 ## Database
 
-The server uses SQLite by default (`chameleon.db`). The database file is automatically created on first run.
+The server uses a **dual database architecture** with SQLite by default. Database files are automatically created on first run.
+
+**Dual Database Design:**
+
+1. **Metadata Database** (required): 
+   - Default: `sqlite:///chameleon_meta.db`
+   - Stores all server configuration, tools, resources, prompts, executable code, and execution logs
+   - Must be available for server to function
+   
+2. **Data Database** (optional):
+   - Default: `sqlite:///chameleon_data.db`
+   - Stores business/application data (e.g., sales_per_day table)
+   - Server can run in "offline mode" if this database is unavailable
+   - Runtime reconnection available via `reconnect_db` tool
 
 **Configuration Methods (in priority order):**
 
-1. **Command-line argument:**
+1. **Command-line arguments:**
    ```bash
-   python server.py --database-url "postgresql://user:pass@host/db"
+   python server.py --metadata-database-url "postgresql://user:pass@host/meta_db"
+   python server.py --data-database-url "postgresql://user:pass@host/data_db"
    ```
 
 2. **YAML configuration file** (`~/.chameleon/config/config.yaml`):
    ```yaml
-   database:
-     url: "postgresql://user:pass@host/db"
+   metadata_database:
+     url: "postgresql://user:pass@host/meta_db"
+   data_database:
+     url: "postgresql://user:pass@host/data_db"
    ```
 
 3. **Environment variable** (for Admin GUI backward compatibility):
@@ -1417,24 +1450,32 @@ The server uses SQLite by default (`chameleon.db`). The database file is automat
    streamlit run admin_gui.py
    ```
 
-4. **Default:** `sqlite:///chameleon.db`
+4. **Defaults:** 
+   - Metadata: `sqlite:///chameleon_meta.db`
+   - Data: `sqlite:///chameleon_data.db`
 
 **Supported databases:** Any SQLAlchemy-compatible database (SQLite, PostgreSQL, MySQL, etc.)
 
 **Examples:**
 
 ```yaml
-# SQLite (default)
-database:
-  url: "sqlite:///chameleon.db"
+# SQLite (default) - Separate databases
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"
+data_database:
+  url: "sqlite:///chameleon_data.db"
 
-# PostgreSQL
-database:
-  url: "postgresql://username:password@localhost:5432/chameleon"
+# PostgreSQL - Separate databases
+metadata_database:
+  url: "postgresql://username:password@localhost:5432/chameleon_meta"
+data_database:
+  url: "postgresql://username:password@localhost:5432/chameleon_data"
 
-# MySQL
-database:
-  url: "mysql://username:password@localhost:3306/chameleon"
+# MySQL - Separate databases
+metadata_database:
+  url: "mysql://username:password@localhost:3306/chameleon_meta"
+data_database:
+  url: "mysql://username:password@localhost:3306/chameleon_data"
 ```
 
 ## Development
