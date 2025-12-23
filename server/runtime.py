@@ -359,7 +359,11 @@ def execute_tool(
         else:
             # Default to python execution with class-based plugin architecture
             # Step 1: Validate code structure
-            validate_code_structure(code_blob)
+            # Allow system tools to bypass strict validation (e.g. for exec usage)
+            if hasattr(tool, 'group') and tool.group == 'system':
+                pass # Skip validation for trusted system tools
+            else:
+                validate_code_structure(code_blob)
             
             # Step 2: Execute the code to load the class definition
             # Create a namespace with base class available
