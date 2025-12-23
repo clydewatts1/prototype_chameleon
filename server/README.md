@@ -752,9 +752,10 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 
-engine = get_engine("sqlite:///chameleon.db")
+# Use metadata database for tool management
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
 
-with Session(engine) as session:
+with Session(meta_engine) as session:
     # Step 1: Create a new tool
     result = execute_tool(
         "create_new_sql_tool",
@@ -929,9 +930,10 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 
-engine = get_engine("sqlite:///chameleon.db")
+# Use metadata database for execution log access
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
 
-with Session(engine) as session:
+with Session(meta_engine) as session:
     error_info = execute_tool(
         "get_last_error",
         "default",
@@ -944,7 +946,7 @@ with Session(engine) as session:
 #### Get Most Recent Error for Specific Tool
 
 ```python
-with Session(engine) as session:
+with Session(meta_engine) as session:
     error_info = execute_tool(
         "get_last_error",
         "default",
@@ -957,7 +959,7 @@ with Session(engine) as session:
 #### Complete Self-Healing Example
 
 ```python
-with Session(engine) as session:
+with Session(meta_engine) as session:
     # Try to run a tool
     try:
         result = execute_tool("calculate", "default", {"x": 10}, session)
@@ -1074,14 +1076,14 @@ Claude Desktop supports MCP servers through its configuration file.
   "mcpServers": {
     "chameleon": {
       "command": "python",
-      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
-      "env": {
-        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
-      }
+      "args": ["/absolute/path/to/prototype_chameleon/server/server.py"],
+      "env": {}
     }
   }
 }
 ```
+
+**Note:** Environment variables are optional. The server will use default database locations or load from `config.yaml`.
 
 3. **Restart Claude Desktop** to load the new configuration.
 
@@ -1102,14 +1104,14 @@ The Cline extension for VS Code supports MCP servers.
   "cline.mcpServers": {
     "chameleon": {
       "command": "python",
-      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
-      "env": {
-        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
-      }
+      "args": ["/absolute/path/to/prototype_chameleon/server/server.py"],
+      "env": {}
     }
   }
 }
 ```
+
+**Note:** Environment variables are optional. The server will use default database locations or load from `config.yaml`.
 
 4. **Reload VS Code** to activate the configuration.
 
@@ -1146,9 +1148,8 @@ Or via a configuration file (location TBD by Google):
 For any MCP-compatible client, you'll need:
 
 - **Command**: Path to your Python interpreter (e.g., `python`, `python3`, or `/path/to/venv/bin/python`)
-- **Args**: `["/absolute/path/to/prototype_chameleon/server.py"]`
-- **Environment Variables** (optional):
-  - `CHAMELEON_DB_URL`: Database connection string (default: `sqlite:///chameleon.db`)
+- **Args**: `["/absolute/path/to/prototype_chameleon/server/server.py"]`
+- **Environment Variables** (optional, server uses config.yaml or defaults otherwise)
 
 ### Testing the Connection
 
@@ -1174,7 +1175,7 @@ If you're using a virtual environment for Chameleon, specify the full path to th
   "mcpServers": {
     "chameleon": {
       "command": "/path/to/prototype_chameleon/venv/bin/python",
-      "args": ["/path/to/prototype_chameleon/server.py"]
+      "args": ["/path/to/prototype_chameleon/server/server.py"]
     }
   }
 }
@@ -1276,9 +1277,9 @@ result = arguments.get('value', 0) * 2
 # Compute hash
 code_hash = hashlib.sha256(code.encode('utf-8')).hexdigest()
 
-# Insert into database
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+# Insert into metadata database
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     # Add code
     vault = CodeVault(hash=code_hash, python_blob=code)
     session.add(vault)
@@ -1310,8 +1311,8 @@ Resources can be either static or dynamic:
 from models import ResourceRegistry, get_engine
 from sqlmodel import Session
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     resource = ResourceRegistry(
         name="my_static_resource",
         uri_schema="myapp://static/info",
@@ -1339,8 +1340,8 @@ result = f"Generated at: {datetime.now()}"
 
 code_hash = hashlib.sha256(code.encode('utf-8')).hexdigest()
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     # Add code to vault
     vault = CodeVault(hash=code_hash, python_blob=code)
     session.add(vault)
@@ -1365,8 +1366,8 @@ Prompts are templates that can be formatted with arguments:
 from models import PromptRegistry, get_engine
 from sqlmodel import Session
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     prompt = PromptRegistry(
         name="bug_report",
         description="Template for filing bug reports",
