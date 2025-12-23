@@ -27,6 +27,15 @@ class ChainTool(ChameleonTool):
     - Error monitoring: Returns detailed reports on partial execution
     """
     
+    # Regex patterns for variable references
+    # Pattern for extracting step IDs (with or without field access)
+    # Matches: ${step_id} or ${step_id.field}
+    STEP_ID_PATTERN = r'\$\{([^.}]+)(?:\.[^}]+)?\}'
+    
+    # Pattern for full variable replacement (including field access)
+    # Matches: ${step_id} or ${step_id.field.nested}
+    VARIABLE_PATTERN = r'\$\{([^}]+)\}'
+    
     def run(self, arguments: Dict[str, Any]) -> Any:
         """
         Execute a chain of tool calls.
@@ -163,6 +172,8 @@ class ChainTool(ChameleonTool):
         """
         Recursively extract all ${step_id.key} or ${step_id} references from an object.
         
+        Uses STEP_ID_PATTERN to extract just the step IDs (before the dot).
+        
         Args:
             obj: Object to scan (dict, list, str, or primitive)
             
@@ -172,9 +183,8 @@ class ChainTool(ChameleonTool):
         refs = set()
         
         if isinstance(obj, str):
-            # Find all ${...} patterns
-            pattern = r'\$\{([^.}]+)(?:\.[^}]+)?\}'
-            matches = re.findall(pattern, obj)
+            # Find all ${...} patterns and extract step IDs
+            matches = re.findall(self.STEP_ID_PATTERN, obj)
             refs.update(matches)
         elif isinstance(obj, dict):
             for value in obj.values():
@@ -188,6 +198,8 @@ class ChainTool(ChameleonTool):
     def _resolve_variables(self, obj: Any, state: Dict[str, Any]) -> Any:
         """
         Recursively resolve ${step_id.key} or ${step_id} references in an object.
+        
+        Uses VARIABLE_PATTERN to match and replace complete variable references.
         
         Args:
             obj: Object to resolve (dict, list, str, or primitive)
@@ -233,8 +245,7 @@ class ChainTool(ChameleonTool):
                 # No key path - return the whole value as string
                 return str(value)
             
-            pattern = r'\$\{([^}]+)\}'
-            return re.sub(pattern, replacer, obj)
+            return re.sub(self.VARIABLE_PATTERN, replacer, obj)
         elif isinstance(obj, dict):
             return {k: self._resolve_variables(v, state) for k, v in obj.items()}
         elif isinstance(obj, list):
