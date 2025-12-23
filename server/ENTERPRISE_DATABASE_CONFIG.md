@@ -1,8 +1,8 @@
 # Enterprise Database Configuration
 
-This document describes the enterprise database configuration features added to the Chameleon MCP Server.
+**Note:** This document describes the legacy single-database configuration. As of the latest version, Chameleon uses a dual database architecture with separate metadata and data databases. See the main [README.md](README.md) for current configuration details.
 
-## Overview
+## Overview (Legacy)
 
 The Chameleon MCP Server now supports flexible database configuration for enterprise environments, including:
 
@@ -17,7 +17,16 @@ Configuration is managed through `~/.chameleon/config/config.yaml`.
 
 ### Basic Configuration (SQLite)
 
-The default configuration uses SQLite with standard table names:
+The default configuration now uses dual databases:
+
+```yaml
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"
+data_database:
+  url: "sqlite:///chameleon_data.db"
+```
+
+**Legacy single database format (still supported):**
 
 ```yaml
 database:
@@ -29,8 +38,10 @@ database:
 Rename tables to match your naming conventions:
 
 ```yaml
-database:
-  url: "sqlite:///chameleon.db"
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"
+data_database:
+  url: "sqlite:///chameleon_data.db"
 
 tables:
   code_vault: "mcp_code_storage"
@@ -45,7 +56,10 @@ tables:
 Use a schema prefix for PostgreSQL, Teradata, or other enterprise databases:
 
 ```yaml
-database:
+metadata_database:
+  url: "postgresql://user:password@host:5432/database"
+  schema: "chameleon_meta"
+data_database:
   url: "postgresql://user:password@host:5432/database"
   schema: "retail_data"
 
@@ -92,7 +106,8 @@ tables:
 
 If no configuration file exists or if the new fields are omitted, the system uses defaults:
 
-- Database: `sqlite:///chameleon.db`
+- Metadata Database: `sqlite:///chameleon_meta.db`
+- Data Database: `sqlite:///chameleon_data.db`
 - Schema: None (SQLite default)
 - Table names: Original defaults (codevault, toolregistry, etc.)
 

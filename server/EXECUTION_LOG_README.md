@@ -243,10 +243,10 @@ The ExecutionLog system is fully integrated:
 
 1. Check that ExecutionLog table exists:
    ```bash
-   sqlite3 chameleon.db ".schema executionlog"
+   sqlite3 chameleon_meta.db ".schema executionlog"
    ```
 
-2. Verify seed_db.py was run with the latest code
+2. Verify database was seeded (server auto-seeds on first run)
 
 3. Check for database write permissions
 
