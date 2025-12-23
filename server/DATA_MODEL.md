@@ -8,6 +8,15 @@ This document details the database schema for the Chameleon MCP Server. The syst
 erDiagram
     ToolRegistry ||--|| CodeVault : references
     ResourceRegistry |o--|| CodeVault : references
+    ToolRegistry ||--o| IconRegistry : references
+
+    IconRegistry {
+        string name PK
+        string svg_content
+        string category
+        string tags
+    }
+
     
     ToolRegistry {
         string tool_name PK
@@ -17,6 +26,8 @@ erDiagram
         string active_hash_ref FK
         boolean is_auto_created
         string group
+        string icon_name FK
+        json extended_metadata
     }
 
     ResourceRegistry {
@@ -88,6 +99,9 @@ Stores definitions for all available tools.
 | `active_hash_ref` | `str` (FK) | Reference to `CodeVault.hash` containing the implementation code. |
 | `is_auto_created` | `bool` | `True` if created by LLM, `False` if system/static. |
 | `group` | `str` | Category for organization (e.g., `utility`, `math`). **Required**. |
+| `icon_name` | `str` (FK) | Reference to `IconRegistry.name` for the tool's icon. |
+| `extended_metadata` | `dict` (JSON) | Additional metadata including verification examples (`usage_guide`, `examples`, `verified`). |
+
 
 ### 2. ResourceRegistry
 Stores static and dynamic resources.
@@ -160,3 +174,14 @@ Dynamic AST-based security rules.
 | `pattern` | `str` | Name to match (e.g., `subprocess`). |
 | `description` | `str` | Reason for policy. |
 | `is_active` | `bool` | Controls enforcement. |
+
+### 8. IconRegistry
+Stores SVG icons for tools.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | `str` (PK) | Unique name of the icon. |
+| `svg_content` | `str` | Raw SVG XML content. |
+| `category` | `str` | Icon category (e.g., `system`, `math`). |
+| `tags` | `str` | Comma-separated tags for searching. |
+

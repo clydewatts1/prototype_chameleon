@@ -19,6 +19,9 @@ Chameleon is an innovative MCP server implementation that stores executable code
 - **Enhanced Security**: AST-based code validation prevents arbitrary top-level code execution
 - **Use Groups**: Organize tools into logical groups (e.g., `utility`, `math`, `system`)
 - **Dual Output Format**: Support for standardized JSON or token-efficient TOON format
+- **Quality Control Protocol**: Integrated `system_verify_tool` builds confidence via in-manual verification examples
+- **Icon Support**: SVG icon management for identifying tools
+
 
 ## Data Model
 
@@ -40,6 +43,7 @@ The project consists of the following main components:
    - `ToolRegistry`: Maps tools to personas with JSON schema definitions. Includes `group` for organization.
    - `ResourceRegistry`: Defines resources with static or dynamic content
    - `PromptRegistry`: Stores prompt templates with argument schemas
+   - `IconRegistry`: Stores SVG icons for tool visualization
 
 3. **runtime.py**: Secure code execution engine
    - AST-based code validation (only allows imports and class definitions at top level)
@@ -384,7 +388,13 @@ You can specify the format using the hidden `_format` argument when calling any 
 
 If `toon-format` library is installed, the output will be encoded in TOON format. If not installed or if encoding fails, it gracefully falls back to JSON.
 
+385: If `toon-format` library is installed, the output will be encoded in TOON format. If not installed or if encoding fails, it gracefully falls back to JSON.
+386:
+### 8. Quality Control (Verification)
+See [QUALITY_CONTROL.md](QUALITY_CONTROL.md) for details on verifying tools using the built-in `system_verify_tool`.
+
 ## Creating Custom Tools
+
 
 Chameleon supports two types of tools: **Python class-based tools** and **SQL-based tools**.
 
