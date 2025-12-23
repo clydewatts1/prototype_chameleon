@@ -38,8 +38,6 @@ class VerifierTool(ChameleonTool):
             ToolRegistry.tool_name == target_tool_name,
             ToolRegistry.target_persona == 'default' # Assumption: verifying default persona tools
         )
-        tool_def = meta_session.exec(statement).first()
-        
         if not tool_def: return f"Error: Tool '{target_tool_name}' not found for default persona."
         
         # 3. Load Target Code (Dynamic Loading)

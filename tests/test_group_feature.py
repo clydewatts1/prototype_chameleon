@@ -147,8 +147,12 @@ def test_group_feature():
     print("\nOK All Tests Passed!")
     
     # Cleanup
+    engine.dispose()
     if os.path.exists(db_path):
-        os.remove(db_path)
+        try:
+            os.remove(db_path)
+        except PermissionError:
+            print("WARNING: Could not remove test database file (file locked).")
     return True
 
 if __name__ == "__main__":
