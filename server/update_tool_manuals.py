@@ -80,6 +80,7 @@ def update_manuals(database_url: str = None):
                             "data": json.dumps({
                                 "business_date": "2024-01-01", 
                                 "store_name": "Test Store", 
+                                "department": "Electronics",
                                 "sales_amount": 100
                             })
                         },
