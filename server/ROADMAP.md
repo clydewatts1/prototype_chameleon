@@ -33,9 +33,10 @@ This document tracks planned architectural improvements, new features, and secur
 
 * [x] **Separate Metadata from Data**:
   * [x] Configure two database engines:
-    1. **Metadata DB**: Local SQLite (`chameleon.db`) for `ToolRegistry`, `CodeVault`.
-    2. **Business DB**: Remote/Production DB (Teradata, Postgres, etc.).
+    1. **Metadata DB**: Local SQLite (`chameleon_meta.db`) for `ToolRegistry`, `CodeVault`.
+    2. **Business DB**: Remote/Production DB (Teradata, Postgres, etc.) - defaults to `chameleon_data.db`.
   * [x] Refactor `runtime.py` to route System Tools to Metadata DB and Data Tools to Business DB.
+  * [x] Implement offline mode when data database is unavailable.
 
 
 * [ ] **Edge-Centric Deployment**:

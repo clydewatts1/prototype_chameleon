@@ -194,8 +194,8 @@ To temporarily disable a macro without deleting it, set `is_active = False`:
 from sqlmodel import Session, select
 from models import MacroRegistry, get_engine
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     statement = select(MacroRegistry).where(MacroRegistry.name == "safe_div")
     macro = session.exec(statement).first()
     if macro:
@@ -222,8 +222,8 @@ arguments:
 from sqlmodel import Session, select
 from models import MacroRegistry, get_engine
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     statement = select(MacroRegistry)
     macros = session.exec(statement).all()
     for macro in macros:
