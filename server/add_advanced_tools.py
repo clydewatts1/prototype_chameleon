@@ -204,7 +204,8 @@ WHEN NOT MATCHED THEN
             target_persona='default',
             description="Upsert data (Insert or Update) based on a key column. Supports SQLite, PostgreSQL, and standard SQL dialects.",
             input_schema=input_schema,
-            active_hash_ref=tool_hash
+            active_hash_ref=tool_hash,
+            group='data'
         )
         session.add(tool)
         print(f"   ✅ Tool 'general_merge_tool' created")
@@ -226,6 +227,7 @@ def register_execute_ddl_tool(session, config):
     tool_code = """from base import ChameleonTool
 from sqlalchemy import text
 import re
+from common.security import SecurityError
 
 class ExecuteDDLTool(ChameleonTool):
     def run(self, arguments):
@@ -274,7 +276,7 @@ class ExecuteDDLTool(ChameleonTool):
         # Additional security: prevent multiple statements
         sql_stripped = ddl_command.rstrip().rstrip(';').rstrip()
         if ';' in sql_stripped:
-            raise ValueError(
+            raise SecurityError(
                 "Multiple SQL statements detected. Only single DDL statements are allowed."
             )
         
@@ -345,7 +347,8 @@ class ExecuteDDLTool(ChameleonTool):
             target_persona='default',
             description="Execute DDL commands (CREATE, ALTER, DROP, TRUNCATE) with safety checks. Requires explicit confirmation.",
             input_schema=input_schema,
-            active_hash_ref=tool_hash
+            active_hash_ref=tool_hash,
+            group='data'
         )
         session.add(tool)
         print(f"   ✅ Tool 'execute_ddl_tool' created")

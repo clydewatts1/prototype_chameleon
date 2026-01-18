@@ -12,8 +12,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.hash_utils import compute_hash
 from datetime import date, timedelta
 from sqlmodel import Session, select
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
+from common.hash_utils import compute_hash
+from datetime import date, timedelta
+from sqlmodel import Session, select
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, SalesPerDay, IconRegistry, get_engine, create_db_and_tables, METADATA_MODELS, DATA_MODELS
 from config import load_config
+import base64
+import random
+import io
+
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    Image = None
+    ImageDraw = None
 
 
 
@@ -27,10 +39,61 @@ def _clear_metadata_database(session: Session) -> None:
     """
     # Delete in order of dependencies
     session.exec(ToolRegistry.__table__.delete())
+    session.exec(IconRegistry.__table__.delete())
     session.exec(ResourceRegistry.__table__.delete())
     session.exec(PromptRegistry.__table__.delete())
     session.exec(CodeVault.__table__.delete())
+    session.exec(SalesPerDay.__table__.delete())
     session.commit()
+
+
+def _generate_leopard_icon() -> tuple[str, str]:
+    """
+    Generate a default 'Leopard Chameleon' icon using Pillow.
+    
+    Returns:
+        tuple: (mime_type, base64_content)
+    """
+    if not Image:
+        print("⚠️  Pillow not installed, skipping icon generation")
+        return "image/png", ""
+
+    # Canvas settings
+    width, height = 256, 256
+    bg_color = (60, 179, 113)  # Medium Sea Green
+    
+    # Create image
+    img = Image.new('RGB', (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+    
+    # Draw leopard spots
+    for _ in range(30):
+        # Random position
+        x = random.randint(20, width - 20)
+        y = random.randint(20, height - 20)
+        
+        # Random size for the spot base
+        r = random.randint(10, 30)
+        
+        # Spot color (dark brown/black)
+        spot_color = (random.randint(30, 60), random.randint(20, 40), random.randint(10, 30))
+        
+        # Draw irregular circle (simple approximation using ellipse)
+        draw.ellipse([x-r, y-r, x+r, y+r], fill=spot_color)
+        
+        # Draw lighter center for some spots ("rosette" look)
+        if random.random() > 0.5:
+            center_r =  int(r * 0.4)
+            center_color = (random.randint(100, 150), random.randint(80, 120), random.randint(40, 80))
+            draw.ellipse([x-center_r, y-center_r, x+center_r, y+center_r], fill=center_color)
+
+    # Convert to base64
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    return "image/png", img_str
+
 
 
 def _clear_data_database(session: Session) -> None:
@@ -89,8 +152,27 @@ def seed_database(metadata_database_url: str = None, data_database_url: str = No
             if existing_tools:
                 print("\n⚠️  Clearing existing metadata...")
                 _clear_metadata_database(session)
+                _clear_metadata_database(session)
                 print("✅ Metadata cleared")
         
+        # Check/Create Default Icon
+        existing_icon = session.exec(select(IconRegistry).where(IconRegistry.icon_name == "default_chameleon")).first()
+        if not existing_icon:
+            print("\n[0] Generating default 'Leopard Chameleon' icon...")
+            mime_type, content = _generate_leopard_icon()
+            if content:
+                default_icon = IconRegistry(
+                    icon_name="default_chameleon",
+                    mime_type=mime_type,
+                    content=content
+                )
+                session.add(default_icon)
+                print("   OK Icon 'default_chameleon' generated and saved")
+            else:
+                print("   ⚠️  Skipped icon generation (dependencies missing)")
+        else:
+            print("\n[0] Default icon 'default_chameleon' already exists")
+
         # Sample Tool 1: Greeting function
         greeting_code = """from base import ChameleonTool
 
@@ -121,7 +203,7 @@ class GreetingTool(ChameleonTool):
         session.add(greeting_vault)
         
         greeting_tool = ToolRegistry(
-            tool_name="greet",
+            tool_name="utility_greet",
             target_persona="default",
             description="Greets a person by name",
             input_schema={
@@ -134,10 +216,11 @@ class GreetingTool(ChameleonTool):
                 },
                 "required": ["name"]
             },
-            active_hash_ref=greeting_hash
+            active_hash_ref=greeting_hash,
+            group="utility"
         )
         session.add(greeting_tool)
-        print(f"   ✅ Tool 'greet' added (hash: {greeting_hash[:16]}...)")
+        print(f"   OK Tool 'utility_greet' added (hash: {greeting_hash[:16]}...)")
         
         # Sample Tool 2: Calculator - Add
         add_code = """from base import ChameleonTool
@@ -160,7 +243,7 @@ class AddTool(ChameleonTool):
         session.add(add_vault)
         
         add_tool = ToolRegistry(
-            tool_name="add",
+            tool_name="math_add",
             target_persona="default",
             description="Add two numbers together",
             input_schema={
@@ -177,10 +260,11 @@ class AddTool(ChameleonTool):
                 },
                 "required": ["a", "b"]
             },
-            active_hash_ref=add_hash
+            active_hash_ref=add_hash,
+            group="math"
         )
         session.add(add_tool)
-        print(f"   ✅ Tool 'add' added (hash: {add_hash[:16]}...)")
+        print(f"   OK Tool 'math_add' added (hash: {add_hash[:16]}...)")
         
         # Sample Tool 3: Calculator - Multiply (for assistant persona)
         multiply_code = """from base import ChameleonTool
@@ -203,7 +287,7 @@ class MultiplyTool(ChameleonTool):
         session.add(multiply_vault)
         
         multiply_tool = ToolRegistry(
-            tool_name="multiply",
+            tool_name="math_multiply",
             target_persona="assistant",
             description="Multiply two numbers together",
             input_schema={
@@ -220,10 +304,11 @@ class MultiplyTool(ChameleonTool):
                 },
                 "required": ["a", "b"]
             },
-            active_hash_ref=multiply_hash
+            active_hash_ref=multiply_hash,
+            group="math"
         )
         session.add(multiply_tool)
-        print(f"   ✅ Tool 'multiply' added (hash: {multiply_hash[:16]}...)")
+        print(f"   OK Tool 'math_multiply' added (hash: {multiply_hash[:16]}...)")
         
         # Sample Tool 4: String manipulation - Uppercase
         uppercase_code = """from base import ChameleonTool
@@ -245,7 +330,7 @@ class UppercaseTool(ChameleonTool):
         session.add(uppercase_vault)
         
         uppercase_tool = ToolRegistry(
-            tool_name="uppercase",
+            tool_name="utility_uppercase",
             target_persona="default",
             description="Convert text to uppercase",
             input_schema={
@@ -258,30 +343,32 @@ class UppercaseTool(ChameleonTool):
                 },
                 "required": ["text"]
             },
-            active_hash_ref=uppercase_hash
+            active_hash_ref=uppercase_hash,
+            group="utility"
         )
         session.add(uppercase_tool)
-        print(f"   ✅ Tool 'uppercase' added (hash: {uppercase_hash[:16]}...)")
+        print(f"   OK Tool 'utility_uppercase' added (hash: {uppercase_hash[:16]}...)")
         
         # Sample Resource 1: Static welcome message
-        print("\n[5] Adding static resource 'welcome_message'...")
+        print("\n[5] Adding static resource 'general_welcome_message'...")
         welcome_resource = ResourceRegistry(
             uri_schema="memo://welcome",
-            name="welcome_message",
+            name="general_welcome_message",
             description="A welcome message for the Chameleon MCP server",
             mime_type="text/plain",
             is_dynamic=False,
             static_content="Welcome to Chameleon!",
             active_hash_ref=None,
-            target_persona="default"
+            target_persona="default",
+            group="general"
         )
         session.add(welcome_resource)
-        print(f"   ✅ Resource 'welcome_message' added")
+        print(f"   OK Resource 'general_welcome_message' added")
         
         # Sample Prompt 1: Code review prompt
-        print("\n[6] Adding prompt 'review_code'...")
+        print("\n[6] Adding prompt 'developer_review_code'...")
         review_code_prompt = PromptRegistry(
-            name="review_code",
+            name="developer_review_code",
             description="Generates a code review request prompt",
             template="Please review this code:\n\n{code}",
             arguments_schema={
@@ -293,10 +380,11 @@ class UppercaseTool(ChameleonTool):
                     }
                 ]
             },
-            target_persona="default"
+            target_persona="default",
+            group="developer"
         )
         session.add(review_code_prompt)
-        print(f"   ✅ Prompt 'review_code' added")
+        print(f"   OK Prompt 'developer_review_code' added")
         
         # Sample Resource 2: Dynamic resource that generates current timestamp
         print("\n[7] Adding dynamic resource 'server_time'...")
@@ -319,16 +407,17 @@ class ServerTimeTool(ChameleonTool):
         
         server_time_resource = ResourceRegistry(
             uri_schema="system://time",
-            name="server_time",
+            name="system_server_time",
             description="Returns the current server time dynamically",
             mime_type="text/plain",
             is_dynamic=True,
             static_content=None,
             active_hash_ref=server_time_hash,
-            target_persona="default"
+            target_persona="default",
+            group="system"
         )
         session.add(server_time_resource)
-        print(f"   ✅ Resource 'server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
+        print(f"   OK Resource 'system_server_time' added (dynamic, hash: {server_time_hash[:16]}...)")
         
         # Sample Tool using SELECT code_type with Jinja2 + SQLAlchemy binding
         print("\n[9] Adding 'get_sales_summary' tool with SELECT code_type (hybrid approach)...")
@@ -357,7 +446,7 @@ ORDER BY total_sales DESC"""
         session.add(sales_query_vault)
         
         sales_tool = ToolRegistry(
-            tool_name="get_sales_summary",
+            tool_name="data_get_sales_summary",
             target_persona="default",
             description="Get sales summary grouped by store and department. Supports optional filtering by store_name and/or department using secure SQL parameter binding.",
             input_schema={
@@ -374,10 +463,11 @@ ORDER BY total_sales DESC"""
                 },
                 "required": []
             },
-            active_hash_ref=sales_query_hash
+            active_hash_ref=sales_query_hash,
+            group="data"
         )
         session.add(sales_tool)
-        print(f"   ✅ Tool 'get_sales_summary' added (hash: {sales_query_hash[:16]}...)")
+        print(f"   OK Tool 'data_get_sales_summary' added (hash: {sales_query_hash[:16]}...)")
         
         # Sample Resource using SELECT code_type
         print("\n[10] Adding 'sales_report' resource with SELECT code_type...")
@@ -400,16 +490,17 @@ LIMIT 10"""
         
         sales_report_resource = ResourceRegistry(
             uri_schema="data://sales/recent",
-            name="sales_report",
+            name="data_sales_report",
             description="Recent sales report showing daily totals by store (last 10 days)",
             mime_type="text/plain",
             is_dynamic=True,
             static_content=None,
             active_hash_ref=sales_report_hash,
-            target_persona="default"
+            target_persona="default",
+            group="data"
         )
         session.add(sales_report_resource)
-        print(f"   ✅ Resource 'sales_report' added (dynamic, hash: {sales_report_hash[:16]}...)")
+        print(f"   OK Resource 'data_sales_report' added (dynamic, hash: {sales_report_hash[:16]}...)")
         
         # Sample Tool demonstrating date filtering with Jinja2 + SQLAlchemy
         print("\n[11] Adding 'get_sales_by_category' tool with date filtering...")
@@ -440,7 +531,7 @@ ORDER BY total_sales DESC"""
         session.add(sales_by_category_vault)
         
         sales_by_category_tool = ToolRegistry(
-            tool_name="get_sales_by_category",
+            tool_name="data_get_sales_by_category",
             target_persona="default",
             description="Get sales summary by category/department with optional date range and minimum amount filtering. Demonstrates secure dynamic SQL with Jinja2 structure + SQLAlchemy parameter binding.",
             input_schema={
@@ -461,10 +552,11 @@ ORDER BY total_sales DESC"""
                 },
                 "required": []
             },
-            active_hash_ref=sales_by_category_hash
+            active_hash_ref=sales_by_category_hash,
+            group="data"
         )
         session.add(sales_by_category_tool)
-        print(f"   ✅ Tool 'get_sales_by_category' added (hash: {sales_by_category_hash[:16]}...)")
+        print(f"   OK Tool 'data_get_sales_by_category' added (hash: {sales_by_category_hash[:16]}...)")
         
         # Sample Tool: get_last_error debugging tool
         print("\n[12] Adding 'get_last_error' debugging tool...")
@@ -516,7 +608,7 @@ class GetLastErrorTool(ChameleonTool):
         session.add(get_last_error_vault)
         
         get_last_error_tool = ToolRegistry(
-            tool_name="get_last_error",
+            tool_name="debug_get_last_error",
             target_persona="default",
             description="Get the last error from the execution log. Returns detailed error information including full Python traceback for AI self-debugging. Optionally filter by tool_name.",
             input_schema={
@@ -529,10 +621,11 @@ class GetLastErrorTool(ChameleonTool):
                 },
                 "required": []
             },
-            active_hash_ref=get_last_error_hash
+            active_hash_ref=get_last_error_hash,
+            group="debug"
         )
         session.add(get_last_error_tool)
-        print(f"   ✅ Tool 'get_last_error' added (hash: {get_last_error_hash[:16]}...)")
+        print(f"   OK Tool 'debug_get_last_error' added (hash: {get_last_error_hash[:16]}...)")
         
         # Commit all metadata changes
         session.commit()
@@ -582,19 +675,19 @@ class GetLastErrorTool(ChameleonTool):
     
     # Show summary
     print("\nTools added:")
-    print("  - greet (persona: default)")
-    print("  - add (persona: default)")
-    print("  - multiply (persona: assistant)")
-    print("  - uppercase (persona: default)")
-    print("  - get_sales_summary (persona: default, code_type: select, with filtering)")
-    print("  - get_sales_by_category (persona: default, code_type: select, with date filtering)")
-    print("  - get_last_error (persona: default, debugging tool for AI self-healing)")
+    print("  - utility_greet (persona: default)")
+    print("  - math_add (persona: default)")
+    print("  - math_multiply (persona: assistant)")
+    print("  - utility_uppercase (persona: default)")
+    print("  - data_get_sales_summary (persona: default, code_type: select, with filtering)")
+    print("  - data_get_sales_by_category (persona: default, code_type: select, with date filtering)")
+    print("  - debug_get_last_error (persona: default, debugging tool for AI self-healing)")
     print("\nResources added:")
-    print("  - welcome_message (static, URI: memo://welcome)")
-    print("  - server_time (dynamic, URI: system://time, code_type: python)")
-    print("  - sales_report (dynamic, URI: data://sales/recent, code_type: select)")
+    print("  - general_welcome_message (static, URI: memo://welcome)")
+    print("  - system_server_time (dynamic, URI: system://time, code_type: python)")
+    print("  - data_sales_report (dynamic, URI: data://sales/recent, code_type: select)")
     print("\nPrompts added:")
-    print("  - review_code")
+    print("  - developer_review_code")
     print("\nSample Data:")
     if data_engine is not None:
         print("  - sales_per_day table: 20 rows")

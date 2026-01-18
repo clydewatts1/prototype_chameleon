@@ -36,6 +36,11 @@ def _get_foreign_key(table_key: str, column: str = 'hash') -> str:
     return f"{table_name}.{column}"
 
 
+def _get_foreign_key_optional(table_key: str, column: str = 'hash') -> str:
+    """Same as _get_foreign_key but doesn't assume logic - just a wrapper for consistency"""
+    return _get_foreign_key(table_key, column)
+
+
 class SalesPerDay(SQLModel, table=True):
     """
     Table for storing daily sales data.
@@ -98,6 +103,18 @@ class ToolRegistry(SQLModel, table=True):
         description="Reference to CodeVault hash"
     )
     is_auto_created: bool = Field(default=False, description="True if tool was created by the LLM, False if system/prebuilt")
+    group: str = Field(description="Group/Category for organization")
+    icon_name: str | None = Field(
+        default=None,
+        foreign_key=_get_foreign_key('icon_registry', 'icon_name'),
+        nullable=True,
+        description="Reference to IconRegistry icon_name"
+    )
+    extended_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="Extended metadata for the tool (manual, examples, usage guide)"
+    )
 
 
 class ResourceRegistry(SQLModel, table=True):
@@ -125,6 +142,7 @@ class ResourceRegistry(SQLModel, table=True):
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the resource")
+    group: str = Field(description="Group/Category for organization")
 
 
 class PromptRegistry(SQLModel, table=True):
@@ -142,6 +160,7 @@ class PromptRegistry(SQLModel, table=True):
     
     # Persona support
     target_persona: str = Field(default="default", description="Target persona for the prompt")
+    group: str = Field(description="Group/Category for organization")
 
 
 class ExecutionLog(SQLModel, table=True):
@@ -226,6 +245,23 @@ class SecurityPolicy(SQLModel, table=True):
     is_active: bool = Field(default=True, description="Whether the policy is currently active")
 
 
+class IconRegistry(SQLModel, table=True):
+    """
+    Table for storing tool icons (SVG or PNG keys).
+    
+    Attributes:
+        icon_name: Unique name of the icon (Primary Key)
+        mime_type: MIME type (e.g., 'image/svg+xml', 'image/png')
+        content: Base64 encoded string or raw SVG text
+    """
+    __tablename__ = _table_config.get('icon_registry', 'iconregistry')
+    __table_args__ = _schema_arg
+    
+    icon_name: str = Field(primary_key=True, description="Unique name of the icon")
+    mime_type: str = Field(description="MIME type of the icon")
+    content: str = Field(sa_column=Column(Text), description="Icon content (Base64 or SVG)")
+
+
 # Database engine setup
 # Usage: engine = get_engine("sqlite:///database.db")
 # For production, replace with appropriate database URL
@@ -245,7 +281,7 @@ def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
 
 
 # Model classification for dual-engine architecture
-METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, SecurityPolicy]
+METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, SecurityPolicy, IconRegistry]
 DATA_MODELS = [SalesPerDay]
 
 

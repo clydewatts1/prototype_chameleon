@@ -65,7 +65,8 @@ def test_basic_select_without_jinja(setup_sales_data):
         target_persona="default",
         description="Test basic select",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -105,7 +106,8 @@ GROUP BY department"""
         target_persona="default",
         description="Test conditional filter",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -142,7 +144,8 @@ def test_multiple_statements_blocked(setup_sales_data):
         target_persona="default",
         description="Test multi statement",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -180,7 +183,8 @@ def test_write_operations_blocked(setup_sales_data, sql_code, operation):
         target_persona="default",
         description=f"Test {operation}",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -214,7 +218,8 @@ def test_parameter_binding_prevents_injection(setup_sales_data):
         target_persona="default",
         description="Test parameter binding",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -254,7 +259,8 @@ def test_trailing_semicolon_allowed(setup_sales_data):
         target_persona="default",
         description="Test trailing semicolon",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -286,7 +292,8 @@ SELECT * FROM sales_per_day LIMIT 3"""
         target_persona="default",
         description="Test multiline comment",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()
@@ -317,7 +324,8 @@ def test_dangerous_keyword_in_query_body_blocked(setup_sales_data):
         target_persona="default",
         description="Test union update",
         input_schema={"type": "object", "properties": {}, "required": []},
-        active_hash_ref=sql_hash
+        active_hash_ref=sql_hash,
+        group='system'
     )
     session.add(tool)
     session.commit()

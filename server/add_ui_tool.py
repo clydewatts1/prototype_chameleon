@@ -122,7 +122,8 @@ def register_ui_creator_tool(database_url: str = None):
                     target_persona='default',
                     description="Create a new Streamlit dashboard with validation",
                     input_schema=input_schema,
-                    active_hash_ref=tool_hash
+                    active_hash_ref=tool_hash,
+                    group='system'
                 )
                 session.add(tool)
                 print(f"   ✅ Meta-tool 'create_dashboard' created")

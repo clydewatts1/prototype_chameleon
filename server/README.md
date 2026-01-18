@@ -17,8 +17,22 @@ Chameleon is an innovative MCP server implementation that stores executable code
 - **Persona-Based Filtering**: Different tools can be exposed to different personas
 - **Code Integrity**: SHA-256 hashing ensures code hasn't been tampered with
 - **Enhanced Security**: AST-based code validation prevents arbitrary top-level code execution
+- **Use Groups**: Organize tools into logical groups (e.g., `utility`, `math`, `system`)
+- **Dual Output Format**: Support for standardized JSON or token-efficient TOON format
+- **Quality Control Protocol**: Integrated `system_verify_tool` builds confidence via in-manual verification examples
+- **Icon Support**: SVG icon management for identifying tools
+
+
+## Data Model
+
+For a detailed Entity Relationship Diagram (ERD) and full schema documentation, see [DATA_MODEL.md](DATA_MODEL.md).
+
+## Server Flow
+
+For a comprehensive visual flow chart showing how the server operates from initialization through request handling, see [SERVER_FLOW_CHART.md](SERVER_FLOW_CHART.md).
 
 ## Architecture
+
 
 The project consists of the following main components:
 
@@ -30,9 +44,10 @@ The project consists of the following main components:
 
 2. **models.py**: Database schema using SQLModel
    - `CodeVault`: Stores executable code with SHA-256 hash as primary key
-   - `ToolRegistry`: Maps tools to personas with JSON schema definitions
+   - `ToolRegistry`: Maps tools to personas with JSON schema definitions. Includes `group` for organization.
    - `ResourceRegistry`: Defines resources with static or dynamic content
    - `PromptRegistry`: Stores prompt templates with argument schemas
+   - `IconRegistry`: Stores SVG icons for tool visualization
 
 3. **runtime.py**: Secure code execution engine
    - AST-based code validation (only allows imports and class definitions at top level)
@@ -118,8 +133,11 @@ server:
   log_level: "INFO"   # DEBUG, INFO, WARNING, ERROR, or CRITICAL
   logs_dir: "logs"    # Directory for log files (relative or absolute path)
 
-database:
-  url: "sqlite:///chameleon.db"  # Database connection URL
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"  # Metadata database (tools, resources, prompts)
+  
+data_database:
+  url: "sqlite:///chameleon_data.db"  # Data database (business data, optional)
 ```
 
 **Default Behavior:**
@@ -130,7 +148,8 @@ If no config file exists, the server uses these defaults:
 - Port: 8000
 - Log Level: INFO
 - Logs Directory: logs
-- Database: sqlite:///chameleon.db
+- Metadata Database: sqlite:///chameleon_meta.db
+- Data Database: sqlite:///chameleon_data.db
 
 **Command-Line Overrides:**
 
@@ -140,8 +159,11 @@ You can override any config value using command-line arguments:
 # Override transport and port
 python server.py --transport sse --port 9000
 
-# Override database URL
-python server.py --database-url postgresql://user:pass@localhost/mydb
+# Override metadata database URL
+python server.py --metadata-database-url postgresql://user:pass@localhost/mydb_meta
+
+# Override data database URL
+python server.py --data-database-url postgresql://user:pass@localhost/mydb_data
 
 # Override log level
 python server.py --log-level DEBUG
@@ -154,6 +176,12 @@ python server.py --help
 ```
 
 **Priority:** Command-line arguments > YAML config > Defaults
+
+**Dual Database Architecture:**
+
+The server uses two separate databases:
+- **Metadata Database** (required): Stores all server configuration, tools, resources, prompts, and executable code
+- **Data Database** (optional): Stores business/application data. The server can operate in "offline mode" if this database is unavailable, with the `reconnect_db` tool available for runtime reconnection
 
 ### 2. Run the MCP Server
 
@@ -220,6 +248,7 @@ The YAML file format (`specs.yaml`):
 tools:
   - name: greet
     persona: default
+    group: utility  # REQUIRED: logical group
     description: Greets a person by name
     code_type: python
     code: |
@@ -236,15 +265,19 @@ tools:
           type: string
       required: [name]
 
+# Note: The loader will automatically save this as 'utility_greet'
+
 resources:
   - uri: memo://welcome
     name: welcome_message
+    group: general  # REQUIRED
     persona: default
     is_dynamic: false
     static_content: "Welcome message here"
 
 prompts:
   - name: review_code
+    group: developer  # REQUIRED
     description: Code review prompt
     template: "Review this code: {code}"
     arguments_schema:
@@ -352,7 +385,33 @@ The server implements the MCP protocol and supports:
 
 Example tool schemas are defined in the database with JSON Schema for validation.
 
+### 7. Output Formats (JSON vs TOON)
+
+Chameleon supports two output formats for tool execution results:
+
+1. **JSON (`json`)**: Standard, human-readable format. Default.
+2. **TOON (`toon`)**: Token-efficient format optimized for LLM context windows.
+
+You can specify the format using the hidden `_format` argument when calling any tool:
+
+```json
+{
+  "name": "get_sales_summary",
+  "arguments": {
+    "_format": "toon"
+  }
+}
+```
+
+If `toon-format` library is installed, the output will be encoded in TOON format. If not installed or if encoding fails, it gracefully falls back to JSON.
+
+385: If `toon-format` library is installed, the output will be encoded in TOON format. If not installed or if encoding fails, it gracefully falls back to JSON.
+386:
+### 8. Quality Control (Verification)
+See [QUALITY_CONTROL.md](QUALITY_CONTROL.md) for details on verifying tools using the built-in `system_verify_tool`.
+
 ## Creating Custom Tools
+
 
 Chameleon supports two types of tools: **Python class-based tools** and **SQL-based tools**.
 
@@ -523,6 +582,7 @@ tools:
   - name: my_tool
     persona: default
     description: My custom Python tool
+    group: examples
     code_type: python  # Optional, defaults to 'python'
     code: |
       from base import ChameleonTool
@@ -692,9 +752,10 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 
-engine = get_engine("sqlite:///chameleon.db")
+# Use metadata database for tool management
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
 
-with Session(engine) as session:
+with Session(meta_engine) as session:
     # Step 1: Create a new tool
     result = execute_tool(
         "create_new_sql_tool",
@@ -869,9 +930,10 @@ from sqlmodel import Session
 from models import get_engine
 from runtime import execute_tool
 
-engine = get_engine("sqlite:///chameleon.db")
+# Use metadata database for execution log access
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
 
-with Session(engine) as session:
+with Session(meta_engine) as session:
     error_info = execute_tool(
         "get_last_error",
         "default",
@@ -884,7 +946,7 @@ with Session(engine) as session:
 #### Get Most Recent Error for Specific Tool
 
 ```python
-with Session(engine) as session:
+with Session(meta_engine) as session:
     error_info = execute_tool(
         "get_last_error",
         "default",
@@ -897,7 +959,7 @@ with Session(engine) as session:
 #### Complete Self-Healing Example
 
 ```python
-with Session(engine) as session:
+with Session(meta_engine) as session:
     # Try to run a tool
     try:
         result = execute_tool("calculate", "default", {"x": 10}, session)
@@ -1014,14 +1076,14 @@ Claude Desktop supports MCP servers through its configuration file.
   "mcpServers": {
     "chameleon": {
       "command": "python",
-      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
-      "env": {
-        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
-      }
+      "args": ["/absolute/path/to/prototype_chameleon/server/server.py"],
+      "env": {}
     }
   }
 }
 ```
+
+**Note:** Environment variables are optional. The server will use default database locations or load from `config.yaml`.
 
 3. **Restart Claude Desktop** to load the new configuration.
 
@@ -1042,14 +1104,14 @@ The Cline extension for VS Code supports MCP servers.
   "cline.mcpServers": {
     "chameleon": {
       "command": "python",
-      "args": ["/absolute/path/to/prototype_chameleon/server.py"],
-      "env": {
-        "CHAMELEON_DB_URL": "sqlite:///chameleon.db"
-      }
+      "args": ["/absolute/path/to/prototype_chameleon/server/server.py"],
+      "env": {}
     }
   }
 }
 ```
+
+**Note:** Environment variables are optional. The server will use default database locations or load from `config.yaml`.
 
 4. **Reload VS Code** to activate the configuration.
 
@@ -1086,9 +1148,8 @@ Or via a configuration file (location TBD by Google):
 For any MCP-compatible client, you'll need:
 
 - **Command**: Path to your Python interpreter (e.g., `python`, `python3`, or `/path/to/venv/bin/python`)
-- **Args**: `["/absolute/path/to/prototype_chameleon/server.py"]`
-- **Environment Variables** (optional):
-  - `CHAMELEON_DB_URL`: Database connection string (default: `sqlite:///chameleon.db`)
+- **Args**: `["/absolute/path/to/prototype_chameleon/server/server.py"]`
+- **Environment Variables** (optional, server uses config.yaml or defaults otherwise)
 
 ### Testing the Connection
 
@@ -1114,7 +1175,7 @@ If you're using a virtual environment for Chameleon, specify the full path to th
   "mcpServers": {
     "chameleon": {
       "command": "/path/to/prototype_chameleon/venv/bin/python",
-      "args": ["/path/to/prototype_chameleon/server.py"]
+      "args": ["/path/to/prototype_chameleon/server/server.py"]
     }
   }
 }
@@ -1216,9 +1277,9 @@ result = arguments.get('value', 0) * 2
 # Compute hash
 code_hash = hashlib.sha256(code.encode('utf-8')).hexdigest()
 
-# Insert into database
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+# Insert into metadata database
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     # Add code
     vault = CodeVault(hash=code_hash, python_blob=code)
     session.add(vault)
@@ -1250,8 +1311,8 @@ Resources can be either static or dynamic:
 from models import ResourceRegistry, get_engine
 from sqlmodel import Session
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     resource = ResourceRegistry(
         name="my_static_resource",
         uri_schema="myapp://static/info",
@@ -1279,8 +1340,8 @@ result = f"Generated at: {datetime.now()}"
 
 code_hash = hashlib.sha256(code.encode('utf-8')).hexdigest()
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     # Add code to vault
     vault = CodeVault(hash=code_hash, python_blob=code)
     session.add(vault)
@@ -1305,8 +1366,8 @@ Prompts are templates that can be formatted with arguments:
 from models import PromptRegistry, get_engine
 from sqlmodel import Session
 
-engine = get_engine("sqlite:///chameleon.db")
-with Session(engine) as session:
+meta_engine = get_engine("sqlite:///chameleon_meta.db")
+with Session(meta_engine) as session:
     prompt = PromptRegistry(
         name="bug_report",
         description="Template for filing bug reports",
@@ -1353,19 +1414,35 @@ with Session(engine) as session:
 
 ## Database
 
-The server uses SQLite by default (`chameleon.db`). The database file is automatically created on first run.
+The server uses a **dual database architecture** with SQLite by default. Database files are automatically created on first run.
+
+**Dual Database Design:**
+
+1. **Metadata Database** (required): 
+   - Default: `sqlite:///chameleon_meta.db`
+   - Stores all server configuration, tools, resources, prompts, executable code, and execution logs
+   - Must be available for server to function
+   
+2. **Data Database** (optional):
+   - Default: `sqlite:///chameleon_data.db`
+   - Stores business/application data (e.g., sales_per_day table)
+   - Server can run in "offline mode" if this database is unavailable
+   - Runtime reconnection available via `reconnect_db` tool
 
 **Configuration Methods (in priority order):**
 
-1. **Command-line argument:**
+1. **Command-line arguments:**
    ```bash
-   python server.py --database-url "postgresql://user:pass@host/db"
+   python server.py --metadata-database-url "postgresql://user:pass@host/meta_db"
+   python server.py --data-database-url "postgresql://user:pass@host/data_db"
    ```
 
 2. **YAML configuration file** (`~/.chameleon/config/config.yaml`):
    ```yaml
-   database:
-     url: "postgresql://user:pass@host/db"
+   metadata_database:
+     url: "postgresql://user:pass@host/meta_db"
+   data_database:
+     url: "postgresql://user:pass@host/data_db"
    ```
 
 3. **Environment variable** (for Admin GUI backward compatibility):
@@ -1374,24 +1451,32 @@ The server uses SQLite by default (`chameleon.db`). The database file is automat
    streamlit run admin_gui.py
    ```
 
-4. **Default:** `sqlite:///chameleon.db`
+4. **Defaults:** 
+   - Metadata: `sqlite:///chameleon_meta.db`
+   - Data: `sqlite:///chameleon_data.db`
 
 **Supported databases:** Any SQLAlchemy-compatible database (SQLite, PostgreSQL, MySQL, etc.)
 
 **Examples:**
 
 ```yaml
-# SQLite (default)
-database:
-  url: "sqlite:///chameleon.db"
+# SQLite (default) - Separate databases
+metadata_database:
+  url: "sqlite:///chameleon_meta.db"
+data_database:
+  url: "sqlite:///chameleon_data.db"
 
-# PostgreSQL
-database:
-  url: "postgresql://username:password@localhost:5432/chameleon"
+# PostgreSQL - Separate databases
+metadata_database:
+  url: "postgresql://username:password@localhost:5432/chameleon_meta"
+data_database:
+  url: "postgresql://username:password@localhost:5432/chameleon_data"
 
-# MySQL
-database:
-  url: "mysql://username:password@localhost:3306/chameleon"
+# MySQL - Separate databases
+metadata_database:
+  url: "mysql://username:password@localhost:3306/chameleon_meta"
+data_database:
+  url: "mysql://username:password@localhost:3306/chameleon_data"
 ```
 
 ## Development

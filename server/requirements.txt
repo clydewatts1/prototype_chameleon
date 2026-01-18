@@ -21,3 +21,9 @@ pytest>=8.0.0
 # asyncio (built-in)
 # hashlib (built-in)
 # typing (built-in)
+
+# Data formatting
+toon-format>=1.0.0
+
+# Image processing for Icons
+Pillow>=10.2.0

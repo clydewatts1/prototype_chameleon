@@ -9,6 +9,8 @@ Prototype Chameleon is an advanced Model Context Protocol (MCP) implementation t
 * **🗄️ Database Agnostic:** Built on SQLModel and SQLAlchemy, enabling seamless deployment on SQLite (default), PostgreSQL, MySQL, or any other supported backend without code changes.
 * **📊 Generative UI:** Includes a "Chameleon UI" feature that enables LLMs to write and host interactive Streamlit dashboards on demand.
 * **🛡️ Secure Execution:** Features a custom runtime with AST-based code validation, hash integrity checks, and persona-based tool filtering.
+* **📂 Group Organization:** Tools, resources, and prompts are organized into logical groups (e.g., `utility`, `system`) with automatic namespacing.
+* **🚀 Self-Improving Agentic System:** An "Autopoietic System" capable of maintaining and creating itself, enabling fully autonomous evolution.
 * **🐞 AI Debugger:** A built-in Streamlit client that connects via stdio to inspect protocol messages and interactively debug server tools.
 
 # Prototype Chameleon - MCP Server and AI Debugger
@@ -46,12 +48,14 @@ prototype_chameleon/
 cd server
 pip install -r requirements.txt
 
-# Initialize the database
-python seed_db.py
-
-# Run the server
+# Run the server (database auto-seeds on first run)
 python server.py
+
+# Optional: Load custom tools from YAML
+python load_specs.py specs.yaml
 ```
+
+**Note:** The server automatically initializes and seeds the database on first run. You no longer need to manually run `seed_db.py` unless you want to reset to defaults.
 
 See [server/README.md](server/README.md) for detailed server documentation.
 
@@ -217,7 +221,25 @@ See [server/EXECUTION_LOG_README.md](server/EXECUTION_LOG_README.md) for complet
        │                                                  │
        │              stdio/JSON-RPC                      │
        └──────────────────────────────────────────────────┘
+                                                          │
+                                    ┌─────────────────────┴─────────────────────┐
+                                    │                                           │
+                              ┌─────▼──────┐                           ┌───────▼────────┐
+                              │ Metadata   │                           │  Data Database │
+                              │  Database  │                           │   (Optional)   │
+                              │            │                           │                │
+                              │  Tools     │                           │ Business Data  │
+                              │  Resources │                           │ sales_per_day  │
+                              │  Prompts   │                           │      etc.      │
+                              │  Code      │                           │                │
+                              └────────────┘                           └────────────────┘
 ```
+
+**Dual Database Design:**
+- **Metadata Database**: Stores all server configuration, tools, and code (required)
+- **Data Database**: Stores business/application data (optional, offline mode available)
+
+For a detailed flow chart, see [server/SERVER_FLOW_CHART.md](server/SERVER_FLOW_CHART.md)
 
 ## Contributing
 

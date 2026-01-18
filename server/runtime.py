@@ -213,6 +213,7 @@ def execute_tool(
         SecurityError: If hash validation fails
         RuntimeError: If data database is required but not available
     """
+    tool_def = None
     try:
         # Check if this is a temporary tool first
         is_temp_tool = False
@@ -239,6 +240,7 @@ def execute_tool(
                 ToolRegistry.target_persona == persona
             )
             tool = meta_session.exec(statement).first()
+            tool_def = tool
             
             if not tool:
                 raise ToolNotFoundError(
@@ -357,7 +359,11 @@ def execute_tool(
         else:
             # Default to python execution with class-based plugin architecture
             # Step 1: Validate code structure
-            validate_code_structure(code_blob)
+            # Allow system tools to bypass strict validation (e.g. for exec usage)
+            if hasattr(tool, 'group') and tool.group == 'system':
+                pass # Skip validation for trusted system tools
+            else:
+                validate_code_structure(code_blob)
             
             # Step 2: Execute the code to load the class definition
             # Create a namespace with base class available
@@ -379,9 +385,19 @@ def execute_tool(
                 )
             
             # Step 4: Instantiate the tool with sessions and context
+            # Define sub_executor for nested tool calls (used by ChainTool)
+            def sub_executor(sub_tool_name: str, sub_arguments: Dict[str, Any]) -> Any:
+                """
+                Execute a sub-tool within the context of another tool.
+                This enables tools like ChainTool to call other tools.
+                Safe from infinite recursion due to DAG validation.
+                """
+                return execute_tool(sub_tool_name, persona, sub_arguments, meta_session, data_session)
+            
             context = {
                 'persona': persona,
                 'tool_name': tool_name,
+                'executor': sub_executor,
             }
             tool_instance = tool_class(meta_session, context, data_session)
             
@@ -400,22 +416,69 @@ def execute_tool(
             
             return result
             
+    except SecurityError:
+        # Re-raise security errors so they are not swallowed by the Smart Error Wrapper
+        # We still log them for the record
+        full_traceback = traceback.format_exc()
+        try:
+            log_execution(
+                tool_name=tool_name,
+                persona=persona,
+                arguments=arguments,
+                status="FAILURE",
+                error_traceback_str=full_traceback,
+                db_session=meta_session
+            )
+        except Exception:
+            pass # Best effort logging
+        raise
+
     except Exception as e:
-        # Capture the full traceback
-        error_traceback_str = traceback.format_exc()
-        
-        # Log failure (to metadata DB)
+        # --- SMART ERROR WRAPPER ---
+        # 1. Log full failure for Admin
+        full_traceback = traceback.format_exc()
         log_execution(
             tool_name=tool_name,
             persona=persona,
             arguments=arguments,
             status="FAILURE",
-            error_traceback_str=error_traceback_str,
+            error_traceback_str=full_traceback,
             db_session=meta_session
         )
         
-        # Re-raise the exception so the client knows it failed
-        raise
+        # 2. Fetch Manual
+        # tool_def should be available from the successfully found tool scope
+        # If tool_def is None (e.g. temp tool or tool not found), manual is empty
+        manual = {}
+        if tool_def and hasattr(tool_def, 'extended_metadata'):
+             manual = tool_def.extended_metadata or {}
+        
+        # 3. Construct Helpful Error
+        error_msg = f"Tool '{tool_name}' failed with error: {str(e)}"
+        
+        if manual:
+            # RISK 1 FIX: Context Explosion Protection
+            # We only grab specific helpful sections, not the whole blob
+            helpful_subset = {
+                "usage_guide": manual.get("usage_guide", "No guide available."),
+                # Only show top 2 examples to save tokens
+                "examples": manual.get("examples", [])[:2],
+                "common_pitfalls": manual.get("pitfalls", [])
+            }
+            
+            manual_str = json.dumps(helpful_subset, indent=2)
+            
+            # Hard limit on characters just in case
+            if len(manual_str) > 1500:
+                manual_str = manual_str[:1500] + "\n... (truncated, use 'system_inspect_tool' for more)"
+
+            error_msg += (
+                "\n\n--- 🛡️ AUTOMATIC HELP SYSTEM ---\n"
+                f"I found the manual for '{tool_name}'. Please use this to correct your request:\n"
+                f"{manual_str}"
+            )
+        
+        return error_msg
 
 
 def _complete_sql_column_values(
@@ -559,22 +622,27 @@ def get_tool_completion(
         return []
 
 
-def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+def list_tools_for_persona(persona: str, db_session: Session, group: str = None) -> List[Dict[str, Any]]:
     """
     List all available tools for a specific persona, including temporary test tools.
     
     Args:
         persona: The persona/context to filter tools by
         db_session: SQLModel Session for database access
+        group: Optional group/category filter
         
     Returns:
         List of dictionaries containing tool information:
         - name: Tool name
         - description: Tool description
         - input_schema: JSON schema for tool arguments
+        - group: Tool group
     """
-    statement = select(ToolRegistry).where(ToolRegistry.target_persona == persona)
-    tools = db_session.exec(statement).all()
+    query = select(ToolRegistry).where(ToolRegistry.target_persona == persona)
+    if group:
+        query = query.where(ToolRegistry.group == group)
+    
+    tools = db_session.exec(query).all()
     
     results = []
     for tool in tools:
@@ -586,6 +654,7 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
             'name': tool.tool_name,
             'description': desc,
             'input_schema': tool.input_schema,
+            'group': tool.group or 'general',
         })
     
     # Add temporary tools for this persona
@@ -604,13 +673,14 @@ def list_tools_for_persona(persona: str, db_session: Session) -> List[Dict[str, 
     return results
 
 
-def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[str, Any]]:
+def list_resources_for_persona(persona: str, db_session: Session, group: str = None) -> List[Dict[str, Any]]:
     """
     List all available resources for a specific persona, including temporary resources.
     
     Args:
         persona: The persona/context to filter resources by
         db_session: SQLModel Session for database access
+        group: Optional group/category filter
         
     Returns:
         List of dictionaries containing resource information:
@@ -618,9 +688,13 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
         - name: Resource name
         - description: Resource description
         - mimeType: MIME type from database
+        - group: Resource group
     """
-    statement = select(ResourceRegistry).where(ResourceRegistry.target_persona == persona)
-    resources = db_session.exec(statement).all()
+    query = select(ResourceRegistry).where(ResourceRegistry.target_persona == persona)
+    if group:
+        query = query.where(ResourceRegistry.group == group)
+        
+    resources = db_session.exec(query).all()
     
     results = [
         {
@@ -628,6 +702,7 @@ def list_resources_for_persona(persona: str, db_session: Session) -> List[Dict[s
             'name': resource.name,
             'description': resource.description,
             'mimeType': resource.mime_type,
+            'group': resource.group or 'general',
         }
         for resource in resources
     ]

@@ -158,19 +158,18 @@ def test_merge_tool_invalid_json(setup_advanced_tools, setup_test_table):
         "data": "not valid json"
     }
     
-    # Execute should raise an error
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="general_merge_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    # Execute should return an error message
+    result = execute_tool(
+        tool_name="general_merge_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
     # Check that error mentions JSON
-    error_msg = str(exc_info.value)
-    assert "JSON" in error_msg or "json" in error_msg
+    assert "failed with error" in result
+    assert "JSON" in result or "json" in result
 
 
 @pytest.mark.integration
@@ -185,17 +184,16 @@ def test_merge_tool_missing_arguments(setup_advanced_tools, setup_test_table):
         "key_value": "999"
     }
     
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="general_merge_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    result = execute_tool(
+        tool_name="general_merge_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
-    error_msg = str(exc_info.value)
-    assert "Missing required arguments" in error_msg or "required" in error_msg.lower()
+    assert "failed with error" in result
+    assert "Missing required arguments" in result or "required" in result.lower()
 
 
 @pytest.mark.integration
@@ -318,17 +316,16 @@ def test_ddl_tool_truncate_table(setup_advanced_tools, setup_test_table):
     }
     
     # This should fail because DELETE is not a DDL command
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="execute_ddl_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    result = execute_tool(
+        tool_name="execute_ddl_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
-    error_msg = str(exc_info.value)
-    assert "Invalid DDL command" in error_msg or "DDL" in error_msg
+    assert "failed with error" in result
+    assert "Invalid DDL command" in result or "DDL" in result
 
 
 @pytest.mark.integration
@@ -343,32 +340,30 @@ def test_ddl_tool_requires_confirmation(setup_advanced_tools, db_session):
         "ddl_command": ddl_command
     }
     
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="execute_ddl_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    result = execute_tool(
+        tool_name="execute_ddl_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
-    error_msg = str(exc_info.value)
-    assert "confirmation" in error_msg.lower()
+    assert "failed with error" in result
+    assert "confirmation" in result.lower()
     
     # Test with wrong confirmation
     arguments["confirmation"] = "yes"  # lowercase, should fail
     
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="execute_ddl_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    result = execute_tool(
+        tool_name="execute_ddl_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
-    error_msg = str(exc_info.value)
-    assert "confirmation" in error_msg.lower() or "YES" in error_msg
+    assert "failed with error" in result
+    assert "confirmation" in result.lower() or "YES" in result
 
 
 @pytest.mark.integration
@@ -383,17 +378,16 @@ def test_ddl_tool_rejects_select(setup_advanced_tools, db_session):
         "confirmation": "YES"
     }
     
-    with pytest.raises(Exception) as exc_info:
-        execute_tool(
-            tool_name="execute_ddl_tool",
-            persona="default",
-            arguments=arguments,
-            meta_session=session,
-            data_session=session
-        )
+    result = execute_tool(
+        tool_name="execute_ddl_tool",
+        persona="default",
+        arguments=arguments,
+        meta_session=session,
+        data_session=session
+    )
     
-    error_msg = str(exc_info.value)
-    assert "Invalid DDL command" in error_msg or "DDL" in error_msg
+    assert "failed with error" in result
+    assert "Invalid DDL command" in result or "DDL" in result
 
 
 @pytest.mark.integration

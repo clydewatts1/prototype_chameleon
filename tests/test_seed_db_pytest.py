@@ -25,7 +25,7 @@ def test_seed_database(db_session):
     # Query and validate data using the same session
     # Check tools
     tools = db_session.exec(select(ToolRegistry)).all()
-    expected_tools = ["greet", "add", "multiply", "uppercase"]
+    expected_tools = ["utility_greet", "math_add", "math_multiply", "utility_uppercase"]
     found_tools = [t.tool_name for t in tools]
     
     for tool in expected_tools:
@@ -33,7 +33,7 @@ def test_seed_database(db_session):
     
     # Check resources
     resources = db_session.exec(select(ResourceRegistry)).all()
-    expected_resources = ["welcome_message", "server_time"]
+    expected_resources = ["general_welcome_message", "system_server_time"]
     found_resources = [r.name for r in resources]
     
     for resource in expected_resources:
@@ -41,7 +41,7 @@ def test_seed_database(db_session):
     
     # Check prompts
     prompts = db_session.exec(select(PromptRegistry)).all()
-    assert any(p.name == "review_code" for p in prompts), "Prompt 'review_code' not found"
+    assert any(p.name == "developer_review_code" for p in prompts), "Prompt 'developer_review_code' not found"
     
     # Check code vaults
     vaults = db_session.exec(select(CodeVault)).all()
