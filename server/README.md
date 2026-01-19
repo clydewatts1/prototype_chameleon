@@ -551,9 +551,10 @@ input_schema:
 
 **Security Features:**
 - Only SELECT statements allowed (read-only)
+- **AST-based validation** using `sqlglot` for mathematical verification of read-only queries
 - Single statement validation (prevents SQL injection via statement chaining)
 - Parameter binding for all values (prevents SQL injection via value injection)
-- Comment-aware validation (strips SQL comments before security checks)
+- Deep AST inspection detects nested write operations in subqueries and CTEs
 - Jinja2 used only for structural logic, never for values
 
 ### Adding Tools via YAML

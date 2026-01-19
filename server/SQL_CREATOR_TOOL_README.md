@@ -153,28 +153,37 @@ ORDER BY business_date DESC
 
 ## Security Features
 
-### 1. SELECT-Only Validation
+### 1. AST-Based READ-Only Validation
 
-The meta-tool validates that all SQL queries start with `SELECT` (case-insensitive, after removing comments). Any attempt to use INSERT, UPDATE, DELETE, DROP, ALTER, or other write operations will be rejected.
+The meta-tool uses **sqlglot AST parsing** (Phase 2 enhancement) to mathematically verify that queries are read-only. The validation:
+
+- Parses SQL into an Abstract Syntax Tree (AST)
+- Verifies the query is an instance of `exp.Query` (SELECT, UNION, WITH, etc.)
+- Walks the entire AST to detect any nested write operations
+- Blocks INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT, REVOKE, MERGE, and other dangerous operations
+- Falls back to sqlparse/regex if sqlglot is unavailable (backward compatibility)
+
+**Key Advantage**: AST validation detects dangerous operations even when nested in subqueries, CTEs, or complex expressions—something regex-based validation might miss.
 
 **Blocked Examples:**
 - `INSERT INTO users ...`
 - `UPDATE products SET ...`
 - `DELETE FROM orders ...`
 - `DROP TABLE ...`
+- `SELECT * FROM (UPDATE users SET flag=1)` - nested write detected!
 
-### 2. Semicolon Injection Prevention
+### 2. Single Statement Validation
 
-The meta-tool checks for semicolons in the middle of queries to prevent statement chaining attacks. Only trailing semicolons are allowed.
+The meta-tool checks for multiple SQL statements to prevent statement chaining attacks using AST parsing.
 
 **Blocked Example:**
 ```sql
 SELECT * FROM users; DROP TABLE users;
 ```
 
-### 3. Comment Removal Before Validation
+### 3. Comment-Aware Parsing
 
-SQL comments (both `--` single-line and `/* */` multi-line) are removed before validation to prevent comment-based bypasses.
+SQL comments (both `--` single-line and `/* */` multi-line) are handled correctly by the parser and don't interfere with validation.
 
 ### 4. Forced Code Type
 
