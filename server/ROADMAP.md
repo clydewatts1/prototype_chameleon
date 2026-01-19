@@ -18,9 +18,9 @@ This document tracks planned architectural improvements, new features, and secur
 
 ## 🛡️ Phase 2: Security & Robustness
 
-* [ ] **SQL AST Validation**:
-  * [ ] Replace Regex-based SQL validation with `sqlglot`.
-  * [ ] Parse query into AST to mathematically verify it is Read-Only (SELECT).
+* [x] **SQL AST Validation**:
+  * [x] Replace Regex-based SQL validation with `sqlglot`.
+  * [x] Parse query into AST to mathematically verify it is Read-Only (SELECT).
 
 * [ ] **Resource Limits**:
   * [ ] Enforce `LIMIT 1000` wrapper on all auto-generated SQL queries to prevent memory crashes.
@@ -67,6 +67,7 @@ This document tracks planned architectural improvements, new features, and secur
 
 ## ✅ Completed / Implemented
 
+* [x] **SQL AST Validation**: `sqlglot` AST parsing for mathematically verified read-only queries.
 * [x] **Secure SQL Tool Creator**: Meta-tool for dynamic read-only SQL generation.
 * [x] **Deep Execution Audit**: `ExecutionLog` and `get_last_error` for self-debugging.
 * [x] **Enterprise Config**: Dynamic table names and schema prefixes.
