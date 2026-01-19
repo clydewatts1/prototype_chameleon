@@ -22,6 +22,7 @@ import re
 import sys
 import traceback
 import json
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
 from sqlalchemy import text, inspect as sa_inspect
@@ -175,8 +176,8 @@ def log_execution(
         print(f"[ExecutionLog] Warning: Failed to log execution: {e}", file=sys.stderr)
         try:
             db_session.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_error:
+            print(f"[ExecutionLog] Warning: Rollback also failed: {rollback_error}", file=sys.stderr)
 
 
 def log_self_correction(
@@ -199,8 +200,6 @@ def log_self_correction(
         return
     
     try:
-        from datetime import datetime, timezone
-        
         # Create a key for this tool's errors
         key = f"{tool_name}_error"
         domain = "self_correction"
@@ -237,8 +236,8 @@ def log_self_correction(
         print(f"[SelfCorrection] Warning: Failed to log self-correction: {e}", file=sys.stderr)
         try:
             db_session.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_error:
+            print(f"[SelfCorrection] Warning: Rollback also failed: {rollback_error}", file=sys.stderr)
 
 
 def execute_tool(

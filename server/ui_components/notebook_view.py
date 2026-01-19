@@ -81,7 +81,11 @@ def show_notebook_view(engine):
                             st.markdown(f"**Key:** `{entry.key}`")
                         
                         with col2:
-                            st.caption(f"Updated: {entry.updated_at.strftime('%Y-%m-%d %H:%M')}")
+                            # Handle potential null updated_at
+                            if entry.updated_at:
+                                st.caption(f"Updated: {entry.updated_at.strftime('%Y-%m-%d %H:%M')}")
+                            else:
+                                st.caption("Updated: N/A")
                             st.caption(f"By: {entry.updated_by}")
                         
                         # Editable value field

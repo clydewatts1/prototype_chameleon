@@ -41,6 +41,19 @@ def _get_foreign_key_optional(table_key: str, column: str = 'hash') -> str:
     return _get_foreign_key(table_key, column)
 
 
+def _utc_now() -> datetime:
+    """
+    Helper function to get current UTC datetime.
+    
+    Used as default factory for timestamp fields to ensure consistency
+    and avoid code duplication across models.
+    
+    Returns:
+        Current datetime in UTC timezone
+    """
+    return datetime.now(timezone.utc)
+
+
 class SalesPerDay(SQLModel, table=True):
     """
     Table for storing daily sales data.
@@ -187,7 +200,7 @@ class ExecutionLog(SQLModel, table=True):
     __table_args__ = _schema_arg
     
     id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of execution (UTC)")
+    timestamp: datetime = Field(default_factory=_utc_now, description="Timestamp of execution (UTC)")
     tool_name: str = Field(description="Name of the tool executed")
     persona: str = Field(description="Persona context")
     arguments: dict = Field(sa_column=Column(JSON), description="Input arguments (JSON)")
@@ -284,8 +297,8 @@ class AgentNotebook(SQLModel, table=True):
     domain: str = Field(primary_key=True, description="Domain/namespace for the memory entry")
     key: str = Field(primary_key=True, description="Unique key within the domain")
     value: str = Field(sa_column=Column(Text), description="The stored memory value")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When created (UTC)")
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When last updated (UTC)")
+    created_at: datetime = Field(default_factory=_utc_now, description="When created (UTC)")
+    updated_at: datetime = Field(default_factory=_utc_now, description="When last updated (UTC)")
     updated_by: str = Field(default="system", description="Who/what last updated this entry")
     is_active: bool = Field(default=True, description="Whether this memory is active")
 
@@ -314,7 +327,7 @@ class NotebookHistory(SQLModel, table=True):
     key: str = Field(description="Key of the notebook entry")
     old_value: str | None = Field(sa_column=Column(Text), default=None, description="Previous value")
     new_value: str = Field(sa_column=Column(Text), description="New value after change")
-    changed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When changed (UTC)")
+    changed_at: datetime = Field(default_factory=_utc_now, description="When changed (UTC)")
     changed_by: str = Field(description="Who/what made this change")
 
 
@@ -341,7 +354,7 @@ class NotebookAudit(SQLModel, table=True):
     domain: str = Field(description="Domain of the accessed entry")
     key: str = Field(description="Key of the accessed entry")
     access_type: str = Field(description="Type of access: 'read', 'write', 'delete'")
-    accessed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When accessed (UTC)")
+    accessed_at: datetime = Field(default_factory=_utc_now, description="When accessed (UTC)")
     accessed_by: str = Field(description="Who/what accessed the entry")
     context_data: dict | None = Field(default=None, sa_column=Column(JSON), description="Additional context (JSON)")
 
