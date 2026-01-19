@@ -189,6 +189,40 @@ SQL comments (both `--` single-line and `/* */` multi-line) are handled correctl
 
 All SQL tools created by the meta-tool are stored in CodeVault with `code_type='select'`, ensuring they are executed using the secure SQL runtime path.
 
+### 5. LIMIT 1000 Resource Protection
+
+To prevent memory crashes and excessive resource consumption, all auto-created SQL tools automatically enforce a **LIMIT 1000** wrapper at execution time. This protection:
+
+- **Applies to all auto-created tools**: Any SQL tool created via `create_new_sql_tool` is subject to LIMIT 1000
+- **Removes existing LIMIT clauses**: If a tool is created with a LIMIT clause (e.g., LIMIT 5000), it will be replaced with LIMIT 1000
+- **Transparent to the LLM**: The LLM doesn't need to specify LIMIT in queries—it's automatically enforced
+- **Prevents runaway queries**: Large datasets cannot cause memory exhaustion
+- **System tools exempt**: Pre-built system tools (is_auto_created=False) do not have this restriction
+
+**Examples:**
+```sql
+-- Query written by LLM:
+SELECT * FROM sales_per_day WHERE store_name = :store_name
+
+-- Executed as:
+SELECT * FROM sales_per_day WHERE store_name = :store_name LIMIT 1000
+```
+
+```sql
+-- Query with existing LIMIT:
+SELECT * FROM sales_per_day ORDER BY business_date LIMIT 5000
+
+-- Executed as (LIMIT replaced):
+SELECT * FROM sales_per_day ORDER BY business_date LIMIT 1000
+```
+
+**Why 1000?** This limit provides a good balance between:
+- Allowing meaningful data analysis (1000 rows is substantial)
+- Preventing memory exhaustion on large tables
+- Maintaining responsive query performance
+
+**Note:** Temporary test tools (created via `create_temp_test_tool`) use LIMIT 3 for quick validation, while system tools have no LIMIT enforcement for full administrative access.
+
 ## Architecture
 
 ### How It Works
