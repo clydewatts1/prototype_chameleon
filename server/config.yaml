@@ -1,6 +1,2 @@
-database:
-  url: sqlite:///chameleon.db
 metadata_database:
-  url: sqlite:///chameleon_meta.db
-data_database:
-  url: sqlite:///chameleon_data.db
+  url: sqlite:///test_export.db
