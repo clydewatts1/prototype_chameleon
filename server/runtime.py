@@ -297,6 +297,7 @@ def execute_tool(
             validate_read_only(rendered_sql)
             
             # Step 4: For temporary tools, inject LIMIT 3 to prevent large data retrieval
+            # For auto-created tools, inject LIMIT 1000 to prevent memory crashes
             if is_temp_tool:
                 # Remove any existing LIMIT clause and add LIMIT 3
                 # Remove trailing semicolons and whitespace
@@ -305,6 +306,14 @@ def execute_tool(
                 sql_no_limit = re.sub(r'\s+LIMIT\s+\d+\s*$', '', sql_stripped, flags=re.IGNORECASE)
                 # Add mandatory LIMIT 3
                 rendered_sql = f"{sql_no_limit} LIMIT 3"
+            elif tool_def and tool_def.is_auto_created:
+                # Auto-created tools (created by LLMs) get LIMIT 1000 to prevent memory crashes
+                # Remove trailing semicolons and whitespace
+                sql_stripped = rendered_sql.rstrip().rstrip(';').rstrip()
+                # Remove any existing LIMIT clause (case-insensitive)
+                sql_no_limit = re.sub(r'\s+LIMIT\s+\d+\s*$', '', sql_stripped, flags=re.IGNORECASE)
+                # Add mandatory LIMIT 1000
+                rendered_sql = f"{sql_no_limit} LIMIT 1000"
             
             # Step 5: Safe execution with SQLAlchemy parameter binding
             # The rendered SQL should use :param_name syntax for values
