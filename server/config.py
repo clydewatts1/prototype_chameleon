@@ -46,7 +46,10 @@ def get_default_config() -> Dict[str, Any]:
             'execution_log': 'executionlog',
             'icon_registry': 'iconregistry',
             'macro_registry': 'macroregistry',
-            'security_policy': 'securitypolicy'
+            'security_policy': 'securitypolicy',
+            'agent_notebook': 'agentnotebook',
+            'notebook_history': 'notebookhistory',
+            'notebook_audit': 'notebookaudit'
         },
         'features': {
             'chameleon_ui': {
