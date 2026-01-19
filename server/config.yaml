@@ -1,2 +1,4 @@
+database:
+  url: sqlite:///test_ui.db
 metadata_database:
-  url: sqlite:///test_export.db
+  url: sqlite:///test_ui.db

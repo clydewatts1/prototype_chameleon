@@ -18,6 +18,7 @@ from sqlmodel import Session, select, create_engine
 from config import load_config
 from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, get_engine
 from common.hash_utils import compute_hash
+from ui_components.notebook_view import show_notebook_view
 
 
 # Database connection setup
@@ -638,7 +639,7 @@ def main():
         st.header("Navigation")
         page = st.radio(
             "Go to:",
-            ["Dashboard", "Tool Registry", "Add New Tool", "Resource Registry", "Add New Resource", "Prompt Registry", "Add New Prompt"]
+            ["Dashboard", "Tool Registry", "Add New Tool", "Resource Registry", "Add New Resource", "Prompt Registry", "Add New Prompt", "Agent Notebook"]
         )
         
         st.divider()
@@ -665,6 +666,9 @@ def main():
         show_prompt_registry()
     elif page == "Add New Prompt":
         show_add_new_prompt()
+    elif page == "Agent Notebook":
+        engine = get_db_engine()
+        show_notebook_view(engine)
 
 
 if __name__ == "__main__":
