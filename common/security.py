@@ -8,6 +8,12 @@ import ast
 import re
 
 try:
+    import sqlglot
+    from sqlglot import exp
+except ImportError:
+    sqlglot = None
+
+try:
     import sqlparse
     from sqlparse import tokens as T
 except ImportError:
@@ -22,14 +28,31 @@ def validate_single_statement(sql: str) -> None:
     """
     Validate that SQL contains only a single statement.
     
+    Uses sqlglot for AST-based validation (Phase 2 enhancement).
+    Falls back to sqlparse or regex if sqlglot is not available.
+    
     Args:
         sql: The SQL query string to validate
         
     Raises:
         SecurityError: If multiple statements are detected
     """
+    if sqlglot:
+        # Use sqlglot AST parsing (preferred method)
+        try:
+            statements = sqlglot.parse(sql)
+            # Filter out None or empty statements
+            real_statements = [stmt for stmt in statements if stmt is not None]
+            if len(real_statements) > 1:
+                raise SecurityError("Multiple SQL statements detected. Only single statements are allowed.")
+            if len(real_statements) == 0:
+                raise SecurityError("Empty SQL query")
+            return
+        except sqlglot.errors.ParseError as e:
+            raise SecurityError(f"Failed to parse SQL: {e}")
+    
     if sqlparse:
-        # Use sqlparse to count statements
+        # Fallback to sqlparse
         parsed = sqlparse.parse(sql)
         # Filter out empty statements (comments or whitespace only)
         real_statements = [p for p in parsed if p.get_type() != 'UNKNOWN' or p.tokens]
@@ -46,18 +69,63 @@ def validate_read_only(sql: str) -> None:
     """
     Validate that SQL is a read-only SELECT statement.
     
+    Uses sqlglot AST parsing for mathematical verification (Phase 2 enhancement).
+    This provides stronger guarantees than regex-based validation by analyzing
+    the abstract syntax tree of the SQL query.
+    
     Args:
         sql: The SQL query string to validate
         
     Raises:
         SecurityError: If write operations are detected or not a SELECT statement
     """
+    if sqlglot:
+        # Use sqlglot AST parsing (Phase 2 implementation)
+        try:
+            parsed = sqlglot.parse_one(sql)
+        except sqlglot.errors.ParseError as e:
+            raise SecurityError(f"Failed to parse SQL: {e}")
+        
+        if parsed is None:
+            raise SecurityError("Empty or invalid SQL query")
+        
+        # Step 1: Check if the top-level statement is a Query type (SELECT, UNION, WITH, etc.)
+        # Query types are read-only operations in SQL
+        if not isinstance(parsed, exp.Query):
+            raise SecurityError(
+                f"Only SELECT statements are allowed. Found: {type(parsed).__name__}"
+            )
+        
+        # Step 2: Walk the entire AST to ensure no write operations are nested anywhere
+        # This catches cases like: SELECT * FROM (SELECT * FROM users) UNION (UPDATE ...)
+        dangerous_types = (
+            exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Create, exp.Alter,
+            exp.TruncateTable, exp.Grant, exp.Revoke, exp.Merge,
+            exp.Commit, exp.Rollback
+        )
+        
+        # Additional dangerous types that might be dialect-specific
+        if hasattr(exp, 'Execute'):
+            dangerous_types = dangerous_types + (exp.Execute,)
+        if hasattr(exp, 'Call'):
+            # Some databases allow CALL for stored procedures
+            dangerous_types = dangerous_types + (exp.Call,)
+        
+        for node in parsed.walk():
+            if isinstance(node, dangerous_types):
+                raise SecurityError(
+                    f"Forbidden operation detected in SQL: {type(node).__name__}"
+                )
+        
+        # If we get here, the query is read-only
+        return
+    
     if not sqlparse:
-        # Fallback to regex-based validation if sqlparse not available
+        # Fallback to regex-based validation if neither sqlglot nor sqlparse is available
         _validate_read_only_fallback(sql)
         return
 
-    # Use sqlparse for robust validation
+    # Use sqlparse for robust validation (legacy fallback)
     try:
         parsed = sqlparse.parse(sql)
     except Exception as e:
