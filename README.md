@@ -239,6 +239,14 @@ See [server/EXECUTION_LOG_README.md](server/EXECUTION_LOG_README.md) for complet
 - **Metadata Database**: Stores all server configuration, tools, and code (required)
 - **Data Database**: Stores business/application data (optional, offline mode available)
 
+**Supported Databases:**
+- SQLite (default, no additional drivers required)
+- PostgreSQL (enterprise-grade, recommended for production)
+- MySQL (wide deployment support)
+- Neo4j (experimental, graph database for data analytics)
+
+For detailed information on database connectivity, connection strings, and setup instructions, see [DATABASE_CONNECTIVITY.md](DATABASE_CONNECTIVITY.md).
+
 For a detailed flow chart, see [server/SERVER_FLOW_CHART.md](server/SERVER_FLOW_CHART.md)
 
 ## Contributing

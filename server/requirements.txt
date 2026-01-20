@@ -5,6 +5,16 @@ mcp>=1.23.3
 sqlmodel>=0.0.27
 sqlalchemy>=2.0.44
 
+# Database drivers (optional, install as needed)
+# MySQL
+pymysql>=1.1.0
+
+# PostgreSQL
+psycopg2-binary>=2.9.9
+
+# Neo4j (graph database)
+neo4j>=5.15.0
+
 # Admin GUI dependencies
 streamlit>=1.52.1
 
