@@ -1,0 +1,79 @@
+# Example configuration for Snowflake database connectivity
+# Copy this file to ~/.chameleon/config/config.yaml or config.yaml in the project root
+
+server:
+  transport: "sse"           # Use "sse" for HTTP/SSE or "stdio" for stdio transport
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"          # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  logs_dir: "logs"
+
+# Metadata Database - Stores Chameleon system data (tools, resources, prompts, code)
+metadata_database:
+  url: "snowflake://chameleon_user:secure_password@xy12345.us-east-1/CHAMELEON_DB/PUBLIC?warehouse=SMALL_WH"
+  # Note: Schema is specified in the URL path (PUBLIC in this case)
+
+# Data Database - Stores business/application data
+data_database:
+  url: "snowflake://chameleon_user:secure_password@xy12345.us-east-1/ANALYTICS_DB/RETAIL?warehouse=LARGE_WH&role=ANALYST_ROLE"
+  # Note: Schema is specified in the URL path (RETAIL in this case)
+
+# Optional: Customize table names
+tables:
+  code_vault: "CHAMELEON_CODE"
+  tool_registry: "CHAMELEON_TOOLS"
+  resource_registry: "CHAMELEON_RESOURCES"
+  prompt_registry: "CHAMELEON_PROMPTS"
+  sales_per_day: "FACT_SALES_DAILY"
+  execution_log: "CHAMELEON_EXECUTION_LOG"
+  icon_registry: "CHAMELEON_ICONS"
+  macro_registry: "CHAMELEON_MACROS"
+  security_policy: "CHAMELEON_SECURITY"
+  agent_notebook: "CHAMELEON_NOTEBOOK"
+  notebook_history: "CHAMELEON_NOTEBOOK_HISTORY"
+  notebook_audit: "CHAMELEON_NOTEBOOK_AUDIT"
+
+# Optional: Chameleon UI features
+features:
+  chameleon_ui:
+    enabled: true
+    apps_dir: "ui_apps"
+
+# Connection String Format:
+# snowflake://username:password@account/database/schema?warehouse=warehouse_name
+#
+# Required Components:
+# - account: Your Snowflake account identifier (e.g., xy12345.us-east-1)
+# - database: Database name (e.g., CHAMELEON_DB)
+# - schema: Schema name (e.g., PUBLIC)
+# - warehouse: Virtual warehouse name (required for queries)
+#
+# Optional Parameters:
+# - role=name              : Role to use for session
+# - authenticator=externalbrowser : Use browser-based SSO
+# - application=chameleon  : Application identifier for tracking
+# - client_session_keep_alive=true : Keep connection alive
+#
+# Example with parameters:
+# url: "snowflake://user:pass@account/db/schema?warehouse=wh&role=ROLE1&authenticator=externalbrowser"
+
+# Important Notes:
+# - Snowflake identifiers are case-insensitive by default (use UPPERCASE or lowercase)
+# - Schema must be specified in the connection string
+# - Warehouse is required for query execution
+# - For SSO authentication, use: authenticator=externalbrowser
+
+# Setup Instructions:
+# 1. Install Snowflake drivers: 
+#    pip install snowflake-sqlalchemy snowflake-connector-python
+# 2. Create database, warehouse, and user in Snowflake (see DATABASE_CONNECTIVITY.md)
+# 3. Update connection strings above with your credentials
+# 4. Test connection: python test_database_connectivity.py
+# 5. Initialize database: python server/load_specs.py server/specs.yaml
+
+# Security Best Practice:
+# Use environment variables for sensitive data:
+# metadata_database:
+#   url: "${SNOWFLAKE_META_URL}"
+# data_database:
+#   url: "${SNOWFLAKE_DATA_URL}"

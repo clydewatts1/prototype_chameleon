@@ -15,6 +15,16 @@ psycopg2-binary>=2.9.9
 # Neo4j (graph database)
 neo4j>=5.15.0
 
+# Teradata
+teradatasql>=17.20.0.28
+
+# Snowflake
+snowflake-sqlalchemy>=1.5.0
+snowflake-connector-python>=3.6.0
+
+# Databricks
+databricks-sql-connector>=2.9.0
+
 # Admin GUI dependencies
 streamlit>=1.52.1
 

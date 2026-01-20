@@ -243,6 +243,9 @@ See [server/EXECUTION_LOG_README.md](server/EXECUTION_LOG_README.md) for complet
 - SQLite (default, no additional drivers required)
 - PostgreSQL (enterprise-grade, recommended for production)
 - MySQL (wide deployment support)
+- Teradata (enterprise data warehouse)
+- Snowflake (cloud-native data warehouse)
+- Databricks (lakehouse platform)
 - Neo4j (experimental, graph database for data analytics)
 
 For detailed information on database connectivity, connection strings, and setup instructions, see [DATABASE_CONNECTIVITY.md](DATABASE_CONNECTIVITY.md).

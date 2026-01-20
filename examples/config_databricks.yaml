@@ -1,0 +1,104 @@
+# Example configuration for Databricks database connectivity
+# Copy this file to ~/.chameleon/config/config.yaml or config.yaml in the project root
+
+server:
+  transport: "sse"           # Use "sse" for HTTP/SSE or "stdio" for stdio transport
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"          # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  logs_dir: "logs"
+
+# Metadata Database - Stores Chameleon system data (tools, resources, prompts, code)
+metadata_database:
+  url: "databricks://token:dapi1234567890abcdef@adb-1234567890123456.7.azuredatabricks.net/sql/1.0/warehouses/abc123def456?catalog=main&schema=chameleon"
+  # Note: Catalog and schema are specified as query parameters
+
+# Data Database - Stores business/application data
+data_database:
+  url: "databricks://token:dapi1234567890abcdef@adb-1234567890123456.7.azuredatabricks.net/sql/1.0/warehouses/xyz789ghi012?catalog=analytics&schema=retail"
+  # Note: Can use different SQL Warehouse for data database
+
+# Optional: Customize table names
+tables:
+  code_vault: "chameleon_code"
+  tool_registry: "chameleon_tools"
+  resource_registry: "chameleon_resources"
+  prompt_registry: "chameleon_prompts"
+  sales_per_day: "fact_sales_daily"
+  execution_log: "chameleon_execution_log"
+  icon_registry: "chameleon_icons"
+  macro_registry: "chameleon_macros"
+  security_policy: "chameleon_security"
+  agent_notebook: "chameleon_notebook"
+  notebook_history: "chameleon_notebook_history"
+  notebook_audit: "chameleon_notebook_audit"
+
+# Optional: Chameleon UI features
+features:
+  chameleon_ui:
+    enabled: true
+    apps_dir: "ui_apps"
+
+# Connection String Format:
+# databricks://token:<access_token>@<workspace_host>/<http_path>?catalog=<catalog>&schema=<schema>
+#
+# Required Components:
+# - token:<access_token> : Personal Access Token (PAT) for authentication
+# - workspace_host       : Your workspace URL (e.g., adb-xxx.azuredatabricks.net)
+# - http_path            : SQL Warehouse HTTP path (e.g., /sql/1.0/warehouses/abc123)
+# - catalog              : Unity Catalog name (e.g., main)
+# - schema               : Schema/database name (e.g., default)
+#
+# How to Get These Values:
+# 1. Access Token:
+#    - Navigate to your Databricks workspace
+#    - Click on your profile → User Settings
+#    - Go to Access Tokens → Generate New Token
+#    - Copy the token (save securely, won't be shown again)
+#
+# 2. Workspace Host:
+#    - Look at your Databricks URL in the browser
+#    - Example: https://adb-1234567890123456.7.azuredatabricks.net
+#    - Use: adb-1234567890123456.7.azuredatabricks.net
+#
+# 3. HTTP Path:
+#    - Navigate to SQL Warehouses in your workspace
+#    - Click on your warehouse
+#    - Go to Connection Details tab
+#    - Copy the HTTP Path (e.g., /sql/1.0/warehouses/abc123def456)
+#
+# 4. Catalog and Schema:
+#    - Use Unity Catalog for production (recommended)
+#    - Default catalog: "main"
+#    - Default schema: "default"
+
+# Important Notes:
+# - Requires a SQL Warehouse (formerly SQL Endpoints)
+# - Unity Catalog is recommended for production
+# - Token should be kept secure (use environment variables)
+# - Different SQL Warehouses can be used for metadata and data databases
+
+# Setup Instructions:
+# 1. Install Databricks driver: 
+#    pip install databricks-sql-connector
+# 2. Generate Personal Access Token in Databricks workspace
+# 3. Get SQL Warehouse HTTP path from Connection Details
+# 4. Create catalog and schema if needed (see DATABASE_CONNECTIVITY.md)
+# 5. Update connection strings above with your credentials
+# 6. Test connection: python test_database_connectivity.py
+# 7. Initialize database: python server/load_specs.py server/specs.yaml
+
+# Security Best Practice:
+# NEVER hardcode tokens! Use environment variables:
+# metadata_database:
+#   url: "${DATABRICKS_META_URL}"
+# data_database:
+#   url: "${DATABRICKS_DATA_URL}"
+#
+# Then set environment variables:
+# export DATABRICKS_META_URL="databricks://token:dapi123@host/path?catalog=main&schema=chameleon"
+# export DATABRICKS_DATA_URL="databricks://token:dapi123@host/path?catalog=analytics&schema=retail"
+
+# Alternative: Use separate environment variable for token
+# metadata_database:
+#   url: "databricks://token:${DATABRICKS_TOKEN}@adb-xxx.azuredatabricks.net/sql/1.0/warehouses/abc123?catalog=main&schema=chameleon"

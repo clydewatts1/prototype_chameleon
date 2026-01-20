@@ -1,6 +1,6 @@
 # Database Connectivity Guide
 
-This guide provides comprehensive information on connecting Chameleon MCP Server to various database systems including MySQL, PostgreSQL, and Neo4j.
+This guide provides comprehensive information on connecting Chameleon MCP Server to various database systems including MySQL, PostgreSQL, Neo4j, Teradata, Snowflake, and Databricks.
 
 ## Overview
 
@@ -18,6 +18,9 @@ Both databases can be configured independently and can use different database sy
 - **SQLite** (default, no additional drivers required)
 - **PostgreSQL** (requires `psycopg2-binary` driver)
 - **MySQL** (requires `pymysql` driver)
+- **Teradata** (requires `teradatasql` driver)
+- **Snowflake** (requires `snowflake-sqlalchemy` and `snowflake-connector-python` drivers)
+- **Databricks** (requires `databricks-sql-connector` driver)
 
 ### Graph Databases (Experimental)
 
@@ -41,8 +44,17 @@ pip install pymysql
 # Neo4j
 pip install neo4j
 
+# Teradata
+pip install teradatasql
+
+# Snowflake
+pip install snowflake-sqlalchemy snowflake-connector-python
+
+# Databricks
+pip install databricks-sql-connector
+
 # Or install all drivers at once
-pip install psycopg2-binary pymysql neo4j
+pip install psycopg2-binary pymysql neo4j teradatasql snowflake-sqlalchemy snowflake-connector-python databricks-sql-connector
 ```
 
 These drivers are optional and only needed if you plan to use the corresponding database.
@@ -275,6 +287,272 @@ data_database:
   url: "bolt://neo4j:password@localhost:7687"
 ```
 
+### Teradata
+
+**Format:**
+```
+teradatasql://username:password@host/database
+```
+
+**Examples:**
+
+```yaml
+# Basic connection
+metadata_database:
+  url: "teradatasql://dbc:dbc@localhost/chameleon_meta"
+
+# Production connection with schema
+metadata_database:
+  url: "teradatasql://chameleon_user:secure_password@tdprod.example.com/analytics_db"
+  schema: "chameleon"
+
+# Connection with additional parameters
+metadata_database:
+  url: "teradatasql://user:pass@host/database?tmode=TERA&charset=UTF8"
+
+# Different databases for metadata and data
+metadata_database:
+  url: "teradatasql://user:pass@tdprod.example.com/system_db"
+  schema: "chameleon_meta"
+
+data_database:
+  url: "teradatasql://user:pass@tdprod.example.com/edw"
+  schema: "retail_data"
+```
+
+**Characteristics:**
+- Enterprise data warehouse platform
+- Excellent for large-scale analytics workloads
+- Supports advanced SQL features
+- Schema support for organization
+- Parallel processing architecture
+- Optimized for complex queries on large datasets
+
+**Setup Steps:**
+
+1. Install Teradata driver:
+```bash
+pip install teradatasql
+```
+
+2. Create database and user in Teradata:
+```sql
+-- Connect as DBC or privileged user
+CREATE DATABASE chameleon_meta AS PERMANENT = 100e6;
+CREATE DATABASE chameleon_data AS PERMANENT = 500e6;
+
+CREATE USER chameleon_user AS PASSWORD = "secure_password"
+    PERM = 10e6;
+
+GRANT ALL ON chameleon_meta TO chameleon_user;
+GRANT ALL ON chameleon_data TO chameleon_user;
+```
+
+3. Test connection:
+```bash
+python test_database_connectivity.py
+```
+
+**Connection Parameters:**
+
+Common query string parameters:
+- `tmode=TERA` - Teradata mode (default: ANSI)
+- `charset=UTF8` - Character set
+- `account=myaccount` - Account string for logging
+- `logmech=LDAP` - Authentication mechanism (TD2, LDAP, KRB5, etc.)
+
+### Snowflake
+
+**Format:**
+```
+snowflake://username:password@account/database/schema?warehouse=warehouse_name
+```
+
+**Examples:**
+
+```yaml
+# Basic connection
+metadata_database:
+  url: "snowflake://chameleon_user:secure_password@xy12345.us-east-1/CHAMELEON_DB/PUBLIC?warehouse=COMPUTE_WH"
+
+# With role specification
+metadata_database:
+  url: "snowflake://user:pass@account.region/database/schema?warehouse=wh&role=CHAMELEON_ROLE"
+
+# Using different databases and warehouses
+metadata_database:
+  url: "snowflake://user:pass@account/METADATA_DB/CHAMELEON_SCHEMA?warehouse=SMALL_WH"
+
+data_database:
+  url: "snowflake://user:pass@account/ANALYTICS_DB/RETAIL_SCHEMA?warehouse=LARGE_WH"
+
+# With additional connection parameters
+metadata_database:
+  url: "snowflake://user:pass@account/database/schema?warehouse=wh&role=role1&authenticator=externalbrowser"
+```
+
+**Characteristics:**
+- Cloud-native data warehouse (AWS, Azure, GCP)
+- Automatic scaling and concurrency
+- Separation of storage and compute
+- Support for semi-structured data (JSON, Avro, Parquet)
+- Time travel and data sharing capabilities
+- Pay-per-use pricing model
+
+**Setup Steps:**
+
+1. Install Snowflake drivers:
+```bash
+pip install snowflake-sqlalchemy snowflake-connector-python
+```
+
+2. Create database and user in Snowflake:
+```sql
+-- As ACCOUNTADMIN or privileged user
+CREATE DATABASE CHAMELEON_DB;
+CREATE DATABASE ANALYTICS_DB;
+
+CREATE WAREHOUSE CHAMELEON_WH WITH
+    WAREHOUSE_SIZE = 'XSMALL'
+    AUTO_SUSPEND = 300
+    AUTO_RESUME = TRUE;
+
+CREATE USER chameleon_user
+    PASSWORD = 'secure_password'
+    DEFAULT_WAREHOUSE = CHAMELEON_WH
+    DEFAULT_ROLE = CHAMELEON_ROLE;
+
+CREATE ROLE CHAMELEON_ROLE;
+
+GRANT USAGE ON WAREHOUSE CHAMELEON_WH TO ROLE CHAMELEON_ROLE;
+GRANT ALL ON DATABASE CHAMELEON_DB TO ROLE CHAMELEON_ROLE;
+GRANT ALL ON DATABASE ANALYTICS_DB TO ROLE CHAMELEON_ROLE;
+GRANT ROLE CHAMELEON_ROLE TO USER chameleon_user;
+```
+
+3. Test connection:
+```bash
+python test_database_connectivity.py
+```
+
+**Connection Parameters:**
+
+Common query string parameters:
+- `warehouse=name` - Virtual warehouse to use (required)
+- `role=name` - Role to use for session
+- `authenticator=externalbrowser` - Use browser-based SSO
+- `account=account_name` - Full account name
+- `region=region_name` - Cloud region
+
+**Important Notes:**
+- Snowflake URLs use your account identifier (e.g., `xy12345.us-east-1`)
+- Schema must be specified in the connection string
+- Warehouse parameter is required for query execution
+- Case sensitivity: Snowflake identifiers are case-insensitive by default
+
+### Databricks
+
+**Format:**
+```
+databricks://token:<access_token>@<workspace_host>/<http_path>?catalog=<catalog>&schema=<schema>
+```
+
+**Examples:**
+
+```yaml
+# Basic connection (Unity Catalog)
+metadata_database:
+  url: "databricks://token:dapi1234567890abcdef@adb-1234567890123456.7.azuredatabricks.net/sql/1.0/warehouses/abc123def456?catalog=main&schema=chameleon"
+
+# Using different catalogs and schemas
+metadata_database:
+  url: "databricks://token:dapi111@company.cloud.databricks.com/sql/1.0/warehouses/wh123?catalog=main&schema=metadata"
+
+data_database:
+  url: "databricks://token:dapi111@company.cloud.databricks.com/sql/1.0/warehouses/wh456?catalog=analytics&schema=retail"
+
+# With additional parameters
+metadata_database:
+  url: "databricks://token:dapi111@workspace.databricks.com/sql/1.0/warehouses/wh123?catalog=main&schema=default&http_path_override=/sql/1.0/warehouses/wh123"
+```
+
+**Characteristics:**
+- Unified analytics platform built on Apache Spark
+- Supports SQL, Python, R, and Scala
+- Unity Catalog for data governance
+- Delta Lake for ACID transactions
+- Lakehouse architecture (combines data warehouse and data lake)
+- Optimized for machine learning and data science workloads
+
+**Setup Steps:**
+
+1. Install Databricks driver:
+```bash
+pip install databricks-sql-connector
+```
+
+2. Get your Databricks access token:
+   - Navigate to your Databricks workspace
+   - Click on your profile → User Settings
+   - Go to Access Tokens → Generate New Token
+   - Copy the token (save it securely, it won't be shown again)
+
+3. Get your SQL Warehouse HTTP path:
+   - Navigate to SQL Warehouses in your Databricks workspace
+   - Click on your warehouse
+   - Go to Connection Details tab
+   - Copy the HTTP Path (e.g., `/sql/1.0/warehouses/abc123def456`)
+
+4. Create catalog and schema (Unity Catalog):
+```sql
+-- As admin user
+CREATE CATALOG IF NOT EXISTS main;
+CREATE SCHEMA IF NOT EXISTS main.chameleon;
+CREATE SCHEMA IF NOT EXISTS main.analytics;
+
+-- Grant permissions
+GRANT ALL PRIVILEGES ON CATALOG main TO `chameleon_user@example.com`;
+GRANT ALL PRIVILEGES ON SCHEMA main.chameleon TO `chameleon_user@example.com`;
+GRANT ALL PRIVILEGES ON SCHEMA main.analytics TO `chameleon_user@example.com`;
+```
+
+5. Test connection:
+```bash
+python test_database_connectivity.py
+```
+
+**Connection Parameters:**
+
+Key components of Databricks URL:
+- `token:<access_token>` - Personal access token for authentication
+- `<workspace_host>` - Your workspace URL (e.g., `adb-xxx.azuredatabricks.net`)
+- `<http_path>` - SQL Warehouse HTTP path from connection details
+- `catalog=<name>` - Unity Catalog name (required)
+- `schema=<name>` - Schema/database name (required)
+
+**Important Notes:**
+- Use Personal Access Tokens (PAT) for authentication
+- Requires a SQL Warehouse (formerly SQL Endpoints)
+- Unity Catalog is recommended for production
+- HTTP path identifies the SQL Warehouse
+- Token should be kept secure (use environment variables)
+
+**Security Best Practice for Databricks:**
+```yaml
+# Bad: Hardcoded token
+metadata_database:
+  url: "databricks://token:dapi1234@host/path?catalog=main&schema=default"
+
+# Good: Use environment variable
+metadata_database:
+  url: "${DATABRICKS_URL}"
+```
+
+Then set environment variable:
+```bash
+export DATABRICKS_URL="databricks://token:dapi1234@host/path?catalog=main&schema=default"
+```
+
 ## Configuration Examples
 
 ### Development Setup (SQLite)
@@ -350,6 +628,75 @@ data_database:
 #   schema: "retail"
 ```
 
+### Enterprise Teradata Setup
+
+```yaml
+server:
+  transport: "sse"
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"
+
+metadata_database:
+  url: "teradatasql://chameleon:secure_pass@tdprod.example.com/system_db"
+  schema: "chameleon"
+
+data_database:
+  url: "teradatasql://chameleon:secure_pass@tdprod.example.com/edw"
+  schema: "retail_analytics"
+```
+
+### Cloud Snowflake Setup
+
+```yaml
+server:
+  transport: "sse"
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"
+
+metadata_database:
+  url: "snowflake://chameleon_user:pass@xy12345.us-east-1/CHAMELEON_META/PUBLIC?warehouse=SMALL_WH"
+
+data_database:
+  url: "snowflake://chameleon_user:pass@xy12345.us-east-1/ANALYTICS/RETAIL?warehouse=LARGE_WH&role=ANALYST_ROLE"
+```
+
+### Databricks Lakehouse Setup
+
+```yaml
+server:
+  transport: "sse"
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"
+
+metadata_database:
+  url: "databricks://token:${DATABRICKS_TOKEN}@adb-xxx.azuredatabricks.net/sql/1.0/warehouses/wh123?catalog=main&schema=chameleon"
+
+data_database:
+  url: "databricks://token:${DATABRICKS_TOKEN}@adb-xxx.azuredatabricks.net/sql/1.0/warehouses/wh456?catalog=analytics&schema=retail"
+```
+
+### Multi-Cloud Hybrid Setup
+
+```yaml
+server:
+  transport: "sse"
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "INFO"
+
+# PostgreSQL for metadata (on-premises)
+metadata_database:
+  url: "postgresql://user:pass@onprem-db:5432/chameleon_meta"
+  schema: "system"
+
+# Snowflake for analytics data (cloud)
+data_database:
+  url: "snowflake://user:pass@account/ANALYTICS_DB/RETAIL?warehouse=ANALYTICS_WH"
+```
+
 ## Connection String Parameters
 
 ### Common Parameters
@@ -370,6 +717,25 @@ All database URLs support additional parameters via query strings:
 - `encrypted=true` - Enable encryption
 - `max_connection_lifetime=3600` - Max connection lifetime
 - `max_connection_pool_size=50` - Connection pool size
+
+**Teradata:**
+- `tmode=TERA` or `tmode=ANSI` - SQL mode (TERA for Teradata extensions, ANSI for standard SQL)
+- `charset=UTF8` - Character set encoding
+- `account=myaccount` - Account string for resource tracking
+- `logmech=TD2` or `logmech=LDAP` - Authentication mechanism
+
+**Snowflake:**
+- `warehouse=name` - Virtual warehouse (required for queries)
+- `role=name` - Role for session access control
+- `authenticator=externalbrowser` - Browser-based SSO authentication
+- `application=chameleon` - Application identifier for tracking
+- `client_session_keep_alive=true` - Keep connection alive
+
+**Databricks:**
+- `catalog=name` - Unity Catalog name (required)
+- `schema=name` - Schema/database name (required)
+- `http_path=path` - SQL Warehouse path (usually in main URL)
+- `_user_agent_entry=chameleon` - User agent for tracking
 
 ## Testing Database Connectivity
 
@@ -506,6 +872,9 @@ data_database:
 pip install pymysql        # For MySQL
 pip install psycopg2-binary  # For PostgreSQL
 pip install neo4j          # For Neo4j
+pip install teradatasql    # For Teradata
+pip install snowflake-sqlalchemy snowflake-connector-python  # For Snowflake
+pip install databricks-sql-connector  # For Databricks
 ```
 
 ## Migration Between Databases
