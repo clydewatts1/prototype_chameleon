@@ -79,42 +79,29 @@ def test_connection(db_name: str, db_url: str) -> bool:
         if db_url.startswith('databricks://'):
             try:
                 from databricks import sql
+                from urllib.parse import urlparse, parse_qs
                 
-                # Extract components from Databricks URL
-                # Format: databricks://token:TOKEN@HOST/PATH?catalog=CAT&schema=SCHEMA
-                parts = db_url.replace('databricks://token:', '').split('@')
-                if len(parts) != 2:
-                    raise ValueError("Invalid Databricks URL format")
+                # Parse Databricks URL using urllib
+                parsed = urlparse(db_url)
                 
-                token = parts[0]
-                rest = parts[1]
+                # Extract token from password field
+                token = parsed.password if parsed.password else ''
+                host = parsed.hostname if parsed.hostname else ''
                 
-                # Split host and path
-                if '/' not in rest:
-                    raise ValueError("Missing HTTP path in Databricks URL")
-                
-                host_and_params = rest.split('?')[0]
-                host_path_parts = host_and_params.split('/', 1)
-                host = host_path_parts[0]
-                http_path = '/' + host_path_parts[1] if len(host_path_parts) > 1 else ''
+                # Extract HTTP path from URL path
+                http_path = parsed.path if parsed.path else ''
                 
                 # Extract query parameters
-                params = {}
-                if '?' in rest:
-                    param_str = rest.split('?')[1]
-                    for param in param_str.split('&'):
-                        if '=' in param:
-                            key, val = param.split('=', 1)
-                            params[key] = val
+                params = parse_qs(parsed.query)
+                catalog = params.get('catalog', ['main'])[0]
+                schema = params.get('schema', ['default'])[0]
                 
-                catalog = params.get('catalog', 'main')
-                schema = params.get('schema', 'default')
-                
-                # Connect to Databricks
+                # Connect to Databricks with timeout
                 connection = sql.connect(
                     server_hostname=host,
                     http_path=http_path,
-                    access_token=token
+                    access_token=token,
+                    _connect_timeout=30  # 30 second connection timeout
                 )
                 
                 cursor = connection.cursor()
@@ -167,8 +154,12 @@ def test_connection(db_name: str, db_url: str) -> bool:
                         version_result = session.exec(text("SELECT VERSION()")).first()
                         print(f"   Version: MySQL {version_result}")
                     elif dialect == 'teradata':
-                        version_result = session.exec(text("SELECT InfoData FROM DBC.DBCInfoV WHERE InfoKey = 'VERSION'")).first()
-                        print(f"   Version: Teradata {version_result}")
+                        try:
+                            version_result = session.exec(text("SELECT InfoData FROM DBC.DBCInfoV WHERE InfoKey = 'VERSION'")).first()
+                            print(f"   Version: Teradata {version_result}")
+                        except Exception:
+                            # Fallback if DBC.DBCInfoV is not accessible
+                            print(f"   Version: Teradata (version info not accessible)")
                     elif dialect == 'snowflake':
                         version_result = session.exec(text("SELECT CURRENT_VERSION()")).first()
                         print(f"   Version: Snowflake {version_result}")

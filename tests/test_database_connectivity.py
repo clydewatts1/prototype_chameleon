@@ -3,6 +3,8 @@ Test database connectivity configuration and validation.
 
 This test suite verifies that database connection strings are correctly
 configured and that the connectivity documentation is accurate.
+
+Supported databases: SQLite, PostgreSQL, MySQL, Neo4j, Teradata, Snowflake, and Databricks.
 """
 
 import sys
@@ -101,6 +103,36 @@ def test_connection_string_formats():
     for fmt in neo4j_formats:
         assert fmt.startswith(("bolt://", "neo4j://", "neo4j+s://"))
         print(f"✅ Valid Neo4j format: {fmt}")
+    
+    # Teradata connection strings
+    teradata_formats = [
+        "teradatasql://user:pass@localhost/db",
+        "teradatasql://user:pass@host.com/db?tmode=TERA&charset=UTF8",
+    ]
+    
+    for fmt in teradata_formats:
+        assert fmt.startswith("teradatasql://")
+        print(f"✅ Valid Teradata format: {fmt}")
+    
+    # Snowflake connection strings
+    snowflake_formats = [
+        "snowflake://user:pass@account/db/schema?warehouse=wh",
+        "snowflake://user:pass@account.region/db/schema?warehouse=wh&role=role1",
+    ]
+    
+    for fmt in snowflake_formats:
+        assert fmt.startswith("snowflake://")
+        print(f"✅ Valid Snowflake format: {fmt}")
+    
+    # Databricks connection strings
+    databricks_formats = [
+        "databricks://token:abc123@host/sql/1.0/warehouses/wh?catalog=main&schema=default",
+        "databricks://token:abc@host.databricks.com/path?catalog=cat&schema=sch",
+    ]
+    
+    for fmt in databricks_formats:
+        assert fmt.startswith("databricks://")
+        print(f"✅ Valid Databricks format: {fmt}")
 
 
 def test_documentation_exists():
@@ -114,10 +146,16 @@ def test_documentation_exists():
     assert "MySQL" in content
     assert "PostgreSQL" in content
     assert "Neo4j" in content
+    assert "Teradata" in content
+    assert "Snowflake" in content
+    assert "Databricks" in content
     assert "Connection String Format" in content
     assert "mysql+pymysql://" in content
     assert "postgresql://" in content
     assert "bolt://" in content
+    assert "teradatasql://" in content
+    assert "snowflake://" in content
+    assert "databricks://" in content
     
     print("✅ DATABASE_CONNECTIVITY.md exists and contains required information")
 
@@ -152,6 +190,9 @@ def test_requirements_has_drivers():
     assert "pymysql" in content
     assert "psycopg2-binary" in content
     assert "neo4j" in content
+    assert "teradatasql" in content
+    assert "snowflake-sqlalchemy" in content
+    assert "databricks-sql-connector" in content
     
     print("✅ server/requirements.txt includes database drivers")
     
@@ -164,6 +205,9 @@ def test_requirements_has_drivers():
     assert "pymysql" in content
     assert "psycopg2-binary" in content
     assert "neo4j" in content
+    assert "teradatasql" in content
+    assert "snowflake-sqlalchemy" in content
+    assert "databricks-sql-connector" in content
     
     print("✅ requirements.txt includes database drivers")
 
