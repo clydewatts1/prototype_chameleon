@@ -27,28 +27,62 @@ server:
 # Metadata Database (system tables: tools, logs, resources, prompts, code vault)
 metadata_database:
   # Database connection URL for system metadata
-  # Examples:
-  #   SQLite: "sqlite:///chameleon_meta.db"
-  #   PostgreSQL: "postgresql://user:password@localhost/dbname"
-  #   MySQL: "mysql://user:password@localhost/dbname"
-  #   Teradata: "teradata://user:password@host/database"
+  # Choose one of the following connection strings based on your database:
+  
+  # SQLite (default, no additional drivers required)
   url: "sqlite:///chameleon_meta.db"
+  # For absolute path:
+  # url: "sqlite:////absolute/path/to/chameleon_meta.db"
+  
+  # PostgreSQL (requires psycopg2-binary)
+  # url: "postgresql://username:password@localhost:5432/chameleon_meta"
+  # With schema:
+  # url: "postgresql://username:password@localhost:5432/chameleon_meta"
+  # schema: "chameleon"
+  
+  # MySQL (requires pymysql)
+  # url: "mysql+pymysql://username:password@localhost:3306/chameleon_meta"
+  # With custom charset:
+  # url: "mysql+pymysql://username:password@localhost:3306/chameleon_meta?charset=utf8mb4"
+  
+  # Neo4j (requires neo4j driver - Note: Neo4j is not fully supported for metadata)
+  # Neo4j is a graph database and requires special handling
+  # For metadata storage, we recommend using a relational database
+  # url: "bolt://username:password@localhost:7687"
   
   # Optional database schema prefix (default: None)
   # Used for enterprise databases where tables must be in a specific schema
-  # Example: "retail_data" or "my_app_schema"
-  # Leave commented out for SQLite (which doesn't support schemas)
+  # Example: "retail_data" or "chameleon_schema"
+  # Leave commented out for SQLite and MySQL (which don't support schemas the same way)
   # schema: "my_app_schema"
 
 # Data Database (business data: sales, inventory, etc.)
 data_database:
   # Database connection URL for business/application data
-  # Examples:
-  #   SQLite: "sqlite:///chameleon_data.db" or "sqlite:///retail.db"
-  #   PostgreSQL: "postgresql://user:password@localhost/dbname"
-  #   MySQL: "mysql://user:password@localhost/dbname"
-  #   Teradata: "teradata://user:password@host/database"
+  # Choose one of the following connection strings based on your database:
+  
+  # SQLite (default, no additional drivers required)
   url: "sqlite:///chameleon_data.db"
+  # For absolute path:
+  # url: "sqlite:////absolute/path/to/chameleon_data.db"
+  
+  # PostgreSQL (requires psycopg2-binary)
+  # url: "postgresql://username:password@localhost:5432/chameleon_data"
+  # With schema:
+  # url: "postgresql://username:password@localhost:5432/chameleon_data"
+  # schema: "business_data"
+  
+  # MySQL (requires pymysql)
+  # url: "mysql+pymysql://username:password@localhost:3306/chameleon_data"
+  # With custom charset and timezone:
+  # url: "mysql+pymysql://username:password@localhost:3306/chameleon_data?charset=utf8mb4&time_zone=%2B00:00"
+  
+  # Neo4j (requires neo4j driver)
+  # Neo4j can be used for graph-based data analysis
+  # Note: This is experimental and requires custom query handling
+  # url: "bolt://username:password@localhost:7687"
+  # For secure connection:
+  # url: "neo4j+s://username:password@localhost:7687"
   
   # Optional database schema prefix (default: None)
   # schema: "my_app_schema"

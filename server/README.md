@@ -140,6 +140,15 @@ data_database:
   url: "sqlite:///chameleon_data.db"  # Data database (business data, optional)
 ```
 
+**Supported Databases:**
+
+- **SQLite** (default): No additional setup required
+- **PostgreSQL**: `postgresql://user:pass@host:port/database`
+- **MySQL**: `mysql+pymysql://user:pass@host:port/database`
+- **Neo4j**: `bolt://user:pass@host:port` (experimental, for data database only)
+
+For comprehensive database connectivity information including connection strings, setup instructions, and examples, see [DATABASE_CONNECTIVITY.md](../DATABASE_CONNECTIVITY.md).
+
 **Default Behavior:**
 
 If no config file exists, the server uses these defaults:

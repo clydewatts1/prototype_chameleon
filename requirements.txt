@@ -10,3 +10,13 @@ pytest
 sqlparse
 sqlglot
 requests
+
+# Database drivers (optional, install as needed)
+# MySQL
+pymysql
+
+# PostgreSQL
+psycopg2-binary
+
+# Neo4j (graph database)
+neo4j
