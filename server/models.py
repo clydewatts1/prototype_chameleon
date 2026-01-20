@@ -41,6 +41,19 @@ def _get_foreign_key_optional(table_key: str, column: str = 'hash') -> str:
     return _get_foreign_key(table_key, column)
 
 
+def _utc_now() -> datetime:
+    """
+    Helper function to get current UTC datetime.
+    
+    Used as default factory for timestamp fields to ensure consistency
+    and avoid code duplication across models.
+    
+    Returns:
+        Current datetime in UTC timezone
+    """
+    return datetime.now(timezone.utc)
+
+
 class SalesPerDay(SQLModel, table=True):
     """
     Table for storing daily sales data.
@@ -187,7 +200,7 @@ class ExecutionLog(SQLModel, table=True):
     __table_args__ = _schema_arg
     
     id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of execution (UTC)")
+    timestamp: datetime = Field(default_factory=_utc_now, description="Timestamp of execution (UTC)")
     tool_name: str = Field(description="Name of the tool executed")
     persona: str = Field(description="Persona context")
     arguments: dict = Field(sa_column=Column(JSON), description="Input arguments (JSON)")
@@ -262,6 +275,90 @@ class IconRegistry(SQLModel, table=True):
     content: str = Field(sa_column=Column(Text), description="Icon content (Base64 or SVG)")
 
 
+class AgentNotebook(SQLModel, table=True):
+    """
+    Table for storing long-term memory entries for the agent.
+    
+    This serves as the agent's "brain" - a key-value store organized by domains
+    for different contexts (user preferences, self-correction logs, project state, etc.).
+    
+    Attributes:
+        domain: Namespace for grouping related memories (e.g., 'user_prefs', 'self_correction')
+        key: Unique key within the domain (Primary Key with domain)
+        value: The stored memory value as text
+        created_at: When this memory was first created (UTC)
+        updated_at: When this memory was last modified (UTC)
+        updated_by: Who/what last updated this entry (e.g., 'user', 'system', 'tool_name')
+        is_active: Whether this memory is currently active (soft delete support)
+    """
+    __tablename__ = _table_config.get('agent_notebook', 'agentnotebook')
+    __table_args__ = _schema_arg
+    
+    domain: str = Field(primary_key=True, description="Domain/namespace for the memory entry")
+    key: str = Field(primary_key=True, description="Unique key within the domain")
+    value: str = Field(sa_column=Column(Text), description="The stored memory value")
+    created_at: datetime = Field(default_factory=_utc_now, description="When created (UTC)")
+    updated_at: datetime = Field(default_factory=_utc_now, description="When last updated (UTC)")
+    updated_by: str = Field(default="system", description="Who/what last updated this entry")
+    is_active: bool = Field(default=True, description="Whether this memory is active")
+
+
+class NotebookHistory(SQLModel, table=True):
+    """
+    Table for storing historical changes to AgentNotebook entries.
+    
+    Every time an AgentNotebook entry is modified, the previous value is saved here
+    to maintain a complete audit trail of how the agent's memory evolves.
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        domain: Domain of the notebook entry (Foreign Key)
+        key: Key of the notebook entry (Foreign Key)
+        old_value: The previous value before the change
+        new_value: The new value after the change
+        changed_at: When this change occurred (UTC)
+        changed_by: Who/what made this change (e.g., 'user', 'system', 'tool_name')
+    """
+    __tablename__ = _table_config.get('notebook_history', 'notebookhistory')
+    __table_args__ = _schema_arg
+    
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    domain: str = Field(description="Domain of the notebook entry")
+    key: str = Field(description="Key of the notebook entry")
+    old_value: str | None = Field(sa_column=Column(Text), default=None, description="Previous value")
+    new_value: str = Field(sa_column=Column(Text), description="New value after change")
+    changed_at: datetime = Field(default_factory=_utc_now, description="When changed (UTC)")
+    changed_by: str = Field(description="Who/what made this change")
+
+
+class NotebookAudit(SQLModel, table=True):
+    """
+    Table for auditing access to AgentNotebook entries.
+    
+    Tracks when and by whom notebook entries are read, providing a complete
+    audit trail of memory access patterns.
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        domain: Domain of the accessed entry
+        key: Key of the accessed entry
+        access_type: Type of access ('read', 'write', 'delete')
+        accessed_at: When the access occurred (UTC)
+        accessed_by: Who/what accessed the entry (e.g., 'user', 'tool_name')
+        context_data: Additional context about the access (JSON)
+    """
+    __tablename__ = _table_config.get('notebook_audit', 'notebookaudit')
+    __table_args__ = _schema_arg
+    
+    id: int | None = Field(default=None, primary_key=True, description="Auto-incrementing ID")
+    domain: str = Field(description="Domain of the accessed entry")
+    key: str = Field(description="Key of the accessed entry")
+    access_type: str = Field(description="Type of access: 'read', 'write', 'delete'")
+    accessed_at: datetime = Field(default_factory=_utc_now, description="When accessed (UTC)")
+    accessed_by: str = Field(description="Who/what accessed the entry")
+    context_data: dict | None = Field(default=None, sa_column=Column(JSON), description="Additional context (JSON)")
+
+
 # Database engine setup
 # Usage: engine = get_engine("sqlite:///database.db")
 # For production, replace with appropriate database URL
@@ -281,7 +378,7 @@ def get_engine(database_url: str = "sqlite:///database.db", echo: bool = False):
 
 
 # Model classification for dual-engine architecture
-METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, SecurityPolicy, IconRegistry]
+METADATA_MODELS = [ToolRegistry, CodeVault, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, SecurityPolicy, IconRegistry, AgentNotebook, NotebookHistory, NotebookAudit]
 DATA_MODELS = [SalesPerDay]
 
 

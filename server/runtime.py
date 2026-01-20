@@ -22,12 +22,13 @@ import re
 import sys
 import traceback
 import json
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Union
 from sqlmodel import Session, select
 from sqlalchemy import text, inspect as sa_inspect
 from mcp.types import AnyUrl
 from jinja2 import Template
-from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry
+from models import CodeVault, ToolRegistry, ResourceRegistry, PromptRegistry, ExecutionLog, MacroRegistry, AgentNotebook
 from base import ChameleonTool
 from common.hash_utils import compute_hash
 from common.security import (
@@ -175,8 +176,68 @@ def log_execution(
         print(f"[ExecutionLog] Warning: Failed to log execution: {e}", file=sys.stderr)
         try:
             db_session.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_error:
+            print(f"[ExecutionLog] Warning: Rollback also failed: {rollback_error}", file=sys.stderr)
+
+
+def log_self_correction(
+    tool_name: str,
+    error_summary: str,
+    db_session: Session = None
+) -> None:
+    """
+    Log a self-correction entry to AgentNotebook for reflexive learning.
+    
+    When a tool crashes, this function stores a lesson in the 'self_correction' domain
+    so that the agent can learn from past mistakes and avoid repeating them.
+    
+    Args:
+        tool_name: Name of the tool that failed
+        error_summary: A brief summary of what went wrong and how to avoid it
+        db_session: SQLModel Session for database access
+    """
+    if db_session is None:
+        return
+    
+    try:
+        # Create a key for this tool's errors
+        key = f"{tool_name}_error"
+        domain = "self_correction"
+        
+        # Check if an entry already exists for this tool
+        statement = select(AgentNotebook).where(
+            AgentNotebook.domain == domain,
+            AgentNotebook.key == key
+        )
+        existing = db_session.exec(statement).first()
+        
+        if existing:
+            # Append to existing entry (keep history of multiple failures)
+            updated_value = f"{existing.value}\n\n[{datetime.now(timezone.utc).isoformat()}] {error_summary}"
+            existing.value = updated_value
+            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_by = "system_reflexive_learning"
+        else:
+            # Create new entry
+            notebook_entry = AgentNotebook(
+                domain=domain,
+                key=key,
+                value=f"[{datetime.now(timezone.utc).isoformat()}] {error_summary}",
+                updated_by="system_reflexive_learning"
+            )
+            db_session.add(notebook_entry)
+        
+        # Commit the self-correction log
+        db_session.commit()
+        
+    except Exception as e:
+        # If self-correction logging fails, don't crash the execution
+        # Just print an error message
+        print(f"[SelfCorrection] Warning: Failed to log self-correction: {e}", file=sys.stderr)
+        try:
+            db_session.rollback()
+        except Exception as rollback_error:
+            print(f"[SelfCorrection] Warning: Rollback also failed: {rollback_error}", file=sys.stderr)
 
 
 def execute_tool(
@@ -455,14 +516,33 @@ def execute_tool(
             db_session=meta_session
         )
         
-        # 2. Fetch Manual
+        # 2. Reflexive Learning: Log self-correction entry
+        # Extract a concise error summary for the agent to learn from
+        error_type = type(e).__name__
+        error_short = str(e)[:200]  # Truncate to 200 chars
+        error_summary = f"{error_type}: {error_short}"
+        
+        # Add context about arguments that caused the failure
+        if arguments:
+            args_summary = ", ".join([f"{k}={v}" for k, v in list(arguments.items())[:3]])
+            if len(arguments) > 3:
+                args_summary += ", ..."
+            error_summary += f" | Failed with args: {args_summary}"
+        
+        log_self_correction(
+            tool_name=tool_name,
+            error_summary=error_summary,
+            db_session=meta_session
+        )
+        
+        # 3. Fetch Manual
         # tool_def should be available from the successfully found tool scope
         # If tool_def is None (e.g. temp tool or tool not found), manual is empty
         manual = {}
         if tool_def and hasattr(tool_def, 'extended_metadata'):
              manual = tool_def.extended_metadata or {}
         
-        # 3. Construct Helpful Error
+        # 4. Construct Helpful Error
         error_msg = f"Tool '{tool_name}' failed with error: {str(e)}"
         
         if manual:
