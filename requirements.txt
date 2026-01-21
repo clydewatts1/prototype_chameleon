@@ -20,3 +20,13 @@ psycopg2-binary
 
 # Neo4j (graph database)
 neo4j
+
+# Teradata
+teradatasql
+
+# Snowflake
+snowflake-sqlalchemy
+snowflake-connector-python
+
+# Databricks
+databricks-sql-connector

@@ -75,7 +75,59 @@ def test_connection(db_name: str, db_url: str) -> bool:
                 print(f"❌ {db_name} connection failed: {e}")
                 return False
         
-        # Standard SQLAlchemy databases
+        # Special handling for Databricks
+        if db_url.startswith('databricks://'):
+            try:
+                from databricks import sql
+                from urllib.parse import urlparse, parse_qs
+                
+                # Parse Databricks URL using urllib
+                parsed = urlparse(db_url)
+                
+                # Extract token from password field
+                token = parsed.password if parsed.password else ''
+                host = parsed.hostname if parsed.hostname else ''
+                
+                # Extract HTTP path from URL path
+                http_path = parsed.path if parsed.path else ''
+                
+                # Extract query parameters
+                params = parse_qs(parsed.query)
+                catalog = params.get('catalog', ['main'])[0]
+                schema = params.get('schema', ['default'])[0]
+                
+                # Connect to Databricks with timeout
+                connection = sql.connect(
+                    server_hostname=host,
+                    http_path=http_path,
+                    access_token=token,
+                    _connect_timeout=30  # 30 second connection timeout
+                )
+                
+                cursor = connection.cursor()
+                cursor.execute("SELECT 1 as num")
+                result = cursor.fetchone()
+                
+                if result and result[0] == 1:
+                    print(f"✅ {db_name} connection successful!")
+                    print(f"   Database type: Databricks (Lakehouse)")
+                    print(f"   Catalog: {catalog}, Schema: {schema}")
+                    cursor.close()
+                    connection.close()
+                    return True
+                
+                cursor.close()
+                connection.close()
+                
+            except ImportError:
+                print(f"❌ {db_name} connection failed: databricks-sql-connector not installed")
+                print(f"   Install with: pip install databricks-sql-connector")
+                return False
+            except Exception as e:
+                print(f"❌ {db_name} connection failed: {e}")
+                return False
+        
+        # Standard SQLAlchemy databases (including Teradata and Snowflake)
         engine = models.get_engine(db_url)
         
         with Session(engine) as session:
@@ -101,6 +153,16 @@ def test_connection(db_name: str, db_url: str) -> bool:
                     elif dialect == 'mysql':
                         version_result = session.exec(text("SELECT VERSION()")).first()
                         print(f"   Version: MySQL {version_result}")
+                    elif dialect == 'teradata':
+                        try:
+                            version_result = session.exec(text("SELECT InfoData FROM DBC.DBCInfoV WHERE InfoKey = 'VERSION'")).first()
+                            print(f"   Version: Teradata {version_result}")
+                        except Exception:
+                            # Fallback if DBC.DBCInfoV is not accessible
+                            print(f"   Version: Teradata (version info not accessible)")
+                    elif dialect == 'snowflake':
+                        version_result = session.exec(text("SELECT CURRENT_VERSION()")).first()
+                        print(f"   Version: Snowflake {version_result}")
                 except Exception as ve:
                     print(f"   Version: Unable to determine ({ve})")
                 
@@ -120,6 +182,12 @@ def test_connection(db_name: str, db_url: str) -> bool:
             print(f"   Install with: pip install psycopg2-binary")
         elif 'neo4j' in str(ie):
             print(f"   Install with: pip install neo4j")
+        elif 'teradatasql' in str(ie):
+            print(f"   Install with: pip install teradatasql")
+        elif 'snowflake' in str(ie):
+            print(f"   Install with: pip install snowflake-sqlalchemy snowflake-connector-python")
+        elif 'databricks' in str(ie):
+            print(f"   Install with: pip install databricks-sql-connector")
         
         return False
         

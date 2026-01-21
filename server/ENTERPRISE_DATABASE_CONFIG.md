@@ -8,7 +8,7 @@ The Chameleon MCP Server now supports flexible database configuration for enterp
 
 - **Custom Table Names**: Rename any table to comply with organizational naming conventions
 - **Schema Prefixes**: Use database schemas for multi-tenant or organized deployments
-- **Multiple Database Engines**: Support for PostgreSQL, Teradata, MySQL, and other SQLAlchemy-compatible databases
+- **Multiple Database Engines**: Support for PostgreSQL, Teradata, Snowflake, Databricks, MySQL, and other SQLAlchemy-compatible databases
 - **Backward Compatibility**: Works seamlessly with existing SQLite configurations
 
 ## Configuration
@@ -53,7 +53,7 @@ tables:
 
 ### Schema Prefix (Enterprise Databases)
 
-Use a schema prefix for PostgreSQL, Teradata, or other enterprise databases:
+Use a schema prefix for PostgreSQL, Teradata, Snowflake, Databricks, or other enterprise databases:
 
 ```yaml
 metadata_database:
