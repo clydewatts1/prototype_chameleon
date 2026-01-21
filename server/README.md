@@ -31,6 +31,10 @@ For a detailed Entity Relationship Diagram (ERD) and full schema documentation, 
 
 For a comprehensive visual flow chart showing how the server operates from initialization through request handling, see [SERVER_FLOW_CHART.md](SERVER_FLOW_CHART.md).
 
+## System Tools
+
+For a comprehensive reference of all available system tools and meta-tools (tool creation, debugging, documentation, etc.), see [SYSTEM_TOOLS_README.md](SYSTEM_TOOLS_README.md).
+
 ## Architecture
 
 
@@ -843,8 +847,7 @@ This allows you to:
 ### Documentation
 
 For complete documentation, see:
-- [SQL_CREATOR_TOOL_README.md](SQL_CREATOR_TOOL_README.md) - Detailed usage guide
-- [IMPLEMENTATION_SUMMARY_SQL_CREATOR.md](IMPLEMENTATION_SUMMARY_SQL_CREATOR.md) - Technical implementation details
+- [SQL_CREATOR_TOOL_README.md](SQL_CREATOR_TOOL_README.md) - Comprehensive usage guide and technical details
 
 ## Deep Execution Audit and Self-Healing
 
@@ -1064,8 +1067,7 @@ This demonstrates:
 ### Documentation
 
 For complete documentation, see:
-- [EXECUTION_LOG_README.md](EXECUTION_LOG_README.md) - Detailed usage guide
-- [IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md](IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md) - Technical implementation details
+- [EXECUTION_LOG_README.md](EXECUTION_LOG_README.md) - Comprehensive usage guide and technical details
 
 ## Connecting AI Clients
 
