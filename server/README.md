@@ -31,6 +31,10 @@ For a detailed Entity Relationship Diagram (ERD) and full schema documentation, 
 
 For a comprehensive visual flow chart showing how the server operates from initialization through request handling, see [SERVER_FLOW_CHART.md](SERVER_FLOW_CHART.md).
 
+## System Tools
+
+For a comprehensive reference of all available system tools and meta-tools (tool creation, debugging, documentation, etc.), see [SYSTEM_TOOLS_README.md](SYSTEM_TOOLS_README.md).
+
 ## Architecture
 
 
