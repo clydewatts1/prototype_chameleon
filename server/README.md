@@ -843,8 +843,7 @@ This allows you to:
 ### Documentation
 
 For complete documentation, see:
-- [SQL_CREATOR_TOOL_README.md](SQL_CREATOR_TOOL_README.md) - Detailed usage guide
-- [IMPLEMENTATION_SUMMARY_SQL_CREATOR.md](IMPLEMENTATION_SUMMARY_SQL_CREATOR.md) - Technical implementation details
+- [SQL_CREATOR_TOOL_README.md](SQL_CREATOR_TOOL_README.md) - Comprehensive usage guide and technical details
 
 ## Deep Execution Audit and Self-Healing
 
@@ -1064,8 +1063,7 @@ This demonstrates:
 ### Documentation
 
 For complete documentation, see:
-- [EXECUTION_LOG_README.md](EXECUTION_LOG_README.md) - Detailed usage guide
-- [IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md](IMPLEMENTATION_SUMMARY_EXECUTION_LOG.md) - Technical implementation details
+- [EXECUTION_LOG_README.md](EXECUTION_LOG_README.md) - Comprehensive usage guide and technical details
 
 ## Connecting AI Clients
 
